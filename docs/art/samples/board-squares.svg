@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 128" width="512" height="256" role="img" aria-label="Board squares: light, dark, portal, wall">
+  <rect width="64" height="64" fill="#dccca5"/>
+  <rect x="64" width="64" height="64" fill="#9c805a"/>
+  <g>
+    <rect x="128" width="64" height="64" fill="#9c805a"/>
+    <rect x="132" y="4" width="56" height="56" fill="none" stroke="#a47fff" stroke-width="3" stroke-dasharray="6 4"/>
+    <circle cx="160" cy="32" r="14" fill="#a47fff" fill-opacity=".28" stroke="#a47fff" stroke-width="2"/>
+    <circle cx="160" cy="32" r="6" fill="#a47fff"/>
+  </g>
+  <rect x="192" width="64" height="64" fill="#0b0a08"/>
+  <path d="M192 0 V64 M224 0 V64 M256 0 V64" stroke="#3b3529" stroke-width="2"/>
+  <text x="32" y="58" font-family="monospace" font-size="10" fill="#3b3529" text-anchor="middle">light</text>
+  <text x="96" y="58" font-family="monospace" font-size="10" fill="#1c1914" text-anchor="middle">dark</text>
+  <text x="160" y="58" font-family="monospace" font-size="10" fill="#ede5d1" text-anchor="middle">portal</text>
+  <text x="224" y="58" font-family="monospace" font-size="10" fill="#a39985" text-anchor="middle">wall</text>
+  <!-- pieces on squares to show contrast on both tones -->
+  <g transform="translate(0 64)">
+    <rect width="128" height="64" fill="#dccca5"/><rect x="64" width="64" height="64" fill="#9c805a"/>
+    <rect x="128" width="128" height="64" fill="#c0c6b3"/><rect x="192" width="64" height="64" fill="#76826c"/>
+    <g transform="translate(0 0) scale(.5)"><g stroke="#1c1914" stroke-width="2.5" stroke-linejoin="round" fill="#f1e9d4"><rect x="15" y="50" width="34" height="8" rx="3.5"/><path d="M21 50 Q24 40 27 35 L37 35 Q40 40 43 50 Z"/><ellipse cx="32" cy="35" rx="10" ry="3.2"/><circle cx="32" cy="24" r="8.5"/></g></g>
+    <g transform="translate(64 0) scale(.5)"><g stroke="#1c1914" stroke-width="2.5" stroke-linejoin="round" fill="#f1e9d4"><rect x="15" y="50" width="34" height="8" rx="3.5"/><path d="M21 50 Q24 40 27 35 L37 35 Q40 40 43 50 Z"/><ellipse cx="32" cy="35" rx="10" ry="3.2"/><circle cx="32" cy="24" r="8.5"/></g></g>
+    <g transform="translate(128 0) scale(.5)"><g stroke="#ede5d1" stroke-width="2.5" stroke-linejoin="round" fill="#2b271f"><rect x="15" y="50" width="34" height="8" rx="3.5"/><path d="M21 50 Q24 40 27 35 L37 35 Q40 40 43 50 Z"/><ellipse cx="32" cy="35" rx="10" ry="3.2"/><circle cx="32" cy="24" r="8.5"/></g></g>
+    <g transform="translate(192 0) scale(.5)"><g stroke="#ede5d1" stroke-width="2.5" stroke-linejoin="round" fill="#2b271f"><rect x="15" y="50" width="34" height="8" rx="3.5"/><path d="M21 50 Q24 40 27 35 L37 35 Q40 40 43 50 Z"/><ellipse cx="32" cy="35" rx="10" ry="3.2"/><circle cx="32" cy="24" r="8.5"/></g></g>
+  </g>
+</svg>

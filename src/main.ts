@@ -58,7 +58,13 @@ import {
   withResult,
 } from '@ui/online-model.ts';
 import type { OnlineEvent, OnlineState } from '@ui/online-model.ts';
-import { attachBoardInput, openSquares, tapBenchSlot, tapSquare } from '@ui/input.ts';
+import {
+  attachBoardInput,
+  attachBoardKeys,
+  openSquares,
+  tapBenchSlot,
+  tapSquare,
+} from '@ui/input.ts';
 import type { Selection, TapResult } from '@ui/input.ts';
 import type { Pos } from '@sim/board.ts';
 import { PIECES } from '@sim/data.ts';
@@ -140,6 +146,7 @@ const sound = createSound(storage);
 /** Board merge bursts still playing during prep. */
 let mergeBursts: TimedMerge[] = [];
 let dropSquare: Pos | undefined;
+let keyCursor: Pos | undefined;
 const logPanel = createLogPanel(infoRoot);
 createFieldManual(infoRoot);
 
@@ -549,6 +556,7 @@ function frame(nowMs: number): void {
     placing && selection?.from === 'board'
       ? game.players[acting()].holdings.board.find((p) => p.id === selection?.id)
       : undefined;
+  const marked = dropSquare ?? keyCursor;
   drawScene(
     ctx,
     layout,
@@ -559,7 +567,7 @@ function frame(nowMs: number): void {
       showHp: animating !== null,
       highlights: placing ? openSquares(game, acting(), selection) : [],
       ...(picked ? { selected: { x: picked.x, y: picked.y } } : {}),
-      ...(dropSquare ? { dropSquare } : {}),
+      ...(marked ? { dropSquare: marked } : {}),
     },
     nowMs,
     reducedMotion,
@@ -570,6 +578,19 @@ function frame(nowMs: number): void {
 attachBoardInput(
   canvas,
   () => layout,
+  (pos) => {
+    if (animating || game.phase !== 'prep') return;
+    moveTo(selection, { kind: 'square', pos });
+  },
+);
+
+attachBoardKeys(
+  canvas,
+  acting,
+  () => keyCursor ?? null,
+  (pos) => {
+    keyCursor = pos ?? undefined;
+  },
   (pos) => {
     if (animating || game.phase !== 'prep') return;
     moveTo(selection, { kind: 'square', pos });

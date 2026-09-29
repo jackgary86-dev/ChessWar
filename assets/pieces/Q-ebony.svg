@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="128" height="128" role="img" aria-label="Ebony Queen">
+  <g stroke="#ede5d1" stroke-width="2.5" stroke-linejoin="round" fill="#2b271f">
+    <rect x="15" y="50" width="34" height="8" rx="3.5"/>
+    <path d="M25 36 Q23 44 21 50 H43 Q41 44 39 36 Z"/><path d="M17 21 L23 35 H41 L47 21 L39 27 L36 11 L32 25 L28 11 L25 27 Z"/><ellipse cx="32" cy="36" rx="10.5" ry="3.2"/><circle cx="17" cy="19.5" r="2.6"/><circle cx="28" cy="9.5" r="2.6"/><circle cx="36" cy="9.5" r="2.6"/><circle cx="47" cy="19.5" r="2.6"/>
+    
+  </g>
+  <path d="M26 29 L26.5 31.5 M31 22 L32 18 M38 43 Q40 45 41 48" stroke="#4a4336" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+</svg>

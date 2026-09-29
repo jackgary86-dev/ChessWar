@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="128" height="128" role="img" aria-label="Ebony Rook">
+  <g stroke="#ede5d1" stroke-width="2.5" stroke-linejoin="round" fill="#2b271f">
+    <rect x="15" y="50" width="34" height="8" rx="3.5"/>
+    <path d="M23 23 H41 L43 44 H21 Z"/><rect x="18" y="44" width="28" height="6" rx="2"/><path d="M19 23 V10 H25 V15 H29.5 V10 H34.5 V15 H39 V10 H45 V23 Z"/>
+    
+  </g>
+  <path d="M25 28 V40 M22 12.5 V19" stroke="#4a4336" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+</svg>

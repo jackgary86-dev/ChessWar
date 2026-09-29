@@ -11,6 +11,7 @@ import type { Pos } from '@sim/board.ts';
 import type { PieceType, Side, StarLevel } from '@sim/types.ts';
 import type { Effect } from './animation.ts';
 import type { Layout } from './layout.ts';
+import { pieceSprite } from './sprites.ts';
 
 export interface DrawPiece {
   readonly type: PieceType;
@@ -105,6 +106,9 @@ const FILES = 'abcdefghijklmnop';
 // Drawing proportions, as fractions of one square.
 const GLYPH_SIZE = 0.78;
 const GLYPH_CENTER_Y = 0.46;
+/** Sprites are square; this fraction of a square leaves room for the star row and HP bar. */
+const SPRITE_SIZE = 0.78;
+const SPRITE_TOP = 0.08;
 const OUTLINE_WIDTH = 0.05;
 const SHADOW_BLUR = 0.12;
 const SHADOW_OFFSET = 0.05;
@@ -285,20 +289,28 @@ function drawPiece(
   const cx = at.x + cell / 2;
   ctx.globalAlpha = piece.alpha ?? 1;
 
-  ctx.font = `${String(Math.round(cell * GLYPH_SIZE))}px ${theme.pieceFont}`;
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  ctx.lineJoin = 'round';
-  ctx.lineWidth = cell * OUTLINE_WIDTH;
+  const sprite = pieceSprite(piece.type, piece.side);
   ctx.shadowColor = SHADOW_COLOR;
   ctx.shadowBlur = cell * SHADOW_BLUR;
   ctx.shadowOffsetY = cell * SHADOW_OFFSET;
-  ctx.strokeStyle = piece.side === 0 ? theme.ebony : theme.ivory;
-  ctx.fillStyle = piece.side === 0 ? theme.ivory : theme.ebony;
-  const glyphY = at.y + cell * GLYPH_CENTER_Y;
-  ctx.strokeText(PIECE_GLYPH[piece.type], cx, glyphY);
-  ctx.shadowColor = 'transparent';
-  ctx.fillText(PIECE_GLYPH[piece.type], cx, glyphY);
+  if (sprite) {
+    const size = cell * SPRITE_SIZE;
+    ctx.drawImage(sprite, cx - size / 2, at.y + cell * SPRITE_TOP, size, size);
+    ctx.shadowColor = 'transparent';
+  } else {
+    // Sprite not loaded yet: the Unicode glyph keeps the piece visible.
+    ctx.font = `${String(Math.round(cell * GLYPH_SIZE))}px ${theme.pieceFont}`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.lineJoin = 'round';
+    ctx.lineWidth = cell * OUTLINE_WIDTH;
+    ctx.strokeStyle = piece.side === 0 ? theme.ebony : theme.ivory;
+    ctx.fillStyle = piece.side === 0 ? theme.ivory : theme.ebony;
+    const glyphY = at.y + cell * GLYPH_CENTER_Y;
+    ctx.strokeText(PIECE_GLYPH[piece.type], cx, glyphY);
+    ctx.shadowColor = 'transparent';
+    ctx.fillText(PIECE_GLYPH[piece.type], cx, glyphY);
+  }
 
   ctx.font = `${String(Math.round(cell * STAR_SIZE))}px ${theme.pieceFont}`;
   ctx.fillStyle = theme.brass;

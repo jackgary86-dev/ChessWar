@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="128" height="128" role="img" aria-label="Ivory Pawn">
+  <g stroke="#1c1914" stroke-width="2.5" stroke-linejoin="round" fill="#f1e9d4">
+    <rect x="15" y="50" width="34" height="8" rx="3.5"/>
+    <path d="M21 50 Q24 40 27 35 L37 35 Q40 40 43 50 Z"/><ellipse cx="32" cy="35" rx="10" ry="3.2"/><circle cx="32" cy="24" r="8.5"/>
+    
+  </g>
+  <path d="M27.5 22 Q29 18.5 33 18.5 M37 41 Q39.5 44 40.5 48" stroke="#cfc3a4" stroke-width="2.2" stroke-linecap="round" fill="none"/>
+</svg>

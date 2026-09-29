@@ -232,7 +232,8 @@ describe('two clients agree', () => {
       const [fa, fb] = await Promise.all([a.next('fight'), b.next('fight')]);
       expect(fb).toEqual(fa);
       const [sa, sb] = await Promise.all([a.stateForRound(round + 1), b.stateForRound(round + 1)]);
-      const [va, vb]: SeatView[] = [sa.state, sb.state];
+      const va: SeatView = sa.state;
+      const vb: SeatView = sb.state;
       expect(va.round).toBe(round + 1);
       expect(vb.round).toBe(va.round);
       expect(va.you.hp).toBe(vb.opponent.hp);

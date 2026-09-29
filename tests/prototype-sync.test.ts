@@ -4,6 +4,7 @@
  * the prototype's DATA block and compares it with the sim's balance data.
  */
 import { readFileSync } from 'node:fs';
+import { runInNewContext } from 'node:vm';
 import { describe, expect, it } from 'vitest';
 import {
   BATTLE,
@@ -27,10 +28,10 @@ function prototypeConstants(names: string[]): Record<string, unknown> {
   const end = html.indexOf('const FILES');
   const lines = html.slice(start, end);
   const geometry = html.slice(html.indexOf('const W = 16'), html.indexOf('const idx'));
-  const strike = html.match(/const STRIKE_RANGE = \d+;/)?.[0] ?? '';
-  const portals = html.match(/const PORTAL_Y = \[[^\]]*\];/)?.[0] ?? '';
+  const strike = /const STRIKE_RANGE = \d+;/.exec(html)?.[0] ?? '';
+  const portals = /const PORTAL_Y = \[[^\]]*\];/.exec(html)?.[0] ?? '';
   const body = `${lines}\n${geometry}\n${portals}\n${strike}\nreturn { ${names.join(', ')} };`;
-  return new Function(body)() as Record<string, unknown>;
+  return runInNewContext(`(() => {\n${body}\n})()`) as Record<string, unknown>;
 }
 
 interface ProtoPiece {

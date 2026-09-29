@@ -5,6 +5,7 @@
  * opaque so the previous player's shop and board cannot be read behind it.
  */
 import type { GameMode } from '@sim/game.ts';
+import logoMark from '../../assets/brand/logo-mark.svg?url';
 import type { OverlayView } from './overlays-model.ts';
 
 export interface OverlayActions {
@@ -43,6 +44,15 @@ function button(label: string, onClick: () => void, primary = false): HTMLButton
   return b;
 }
 
+/** The Chess War mark as a decorative image (the heading beside it names the game). */
+function logo(className: string): HTMLImageElement {
+  const img = el('img', className);
+  img.src = logoMark;
+  img.alt = '';
+  img.draggable = false;
+  return img;
+}
+
 function onlineMenu(error: string | null, actions: OverlayActions): HTMLElement[] {
   const name = el('input');
   name.type = 'text';
@@ -78,8 +88,10 @@ function boxFor(view: OverlayView, actions: OverlayActions): HTMLElement {
   const box = el('div', 'box');
   switch (view.kind) {
     case 'start':
+      box.classList.add('start');
       box.append(
-        el('h2', undefined, 'Chess War'),
+        logo('logo'),
+        el('h2', 'wordmark', 'Chess War'),
         el('p', undefined, 'An auto-battler played with real chess pieces.'),
         button(
           'Play vs AI',
@@ -130,18 +142,22 @@ function boxFor(view: OverlayView, actions: OverlayActions): HTMLElement {
       );
       break;
     case 'handoff':
+      box.classList.add('handoff');
       box.append(
+        logo('logo small'),
         el('h2', undefined, `Pass to ${view.name}`),
         el('p', undefined, `Round ${String(view.round)}. ${view.otherName}, look away.`),
         button(`I am ${view.name}`, actions.confirmHandoff, true),
       );
       break;
     case 'result':
+      box.classList.add('outcome', `tone-${view.tone}`);
       box.append(el('h2', undefined, view.title), el('p', 'muted', view.subtitle));
       for (const line of view.lines) box.append(el('p', undefined, line));
       box.append(button(view.button, actions.nextRound, true));
       break;
     case 'over':
+      box.classList.add('outcome', 'final', `tone-${view.tone}`);
       box.append(
         el('h2', undefined, view.title),
         el('p', undefined, view.subtitle),

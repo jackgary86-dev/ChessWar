@@ -452,6 +452,52 @@ body {
   margin: 0;
 }
 
+/* Start and handoff screens carry the mark; the wordmark uses the display face. */
+.overlay .logo {
+  width: 88px;
+  height: 88px;
+  margin-inline: auto;
+}
+
+.overlay .logo.small {
+  width: 48px;
+  height: 48px;
+}
+
+.overlay h2.wordmark {
+  font-family: Cinzel, Georgia, 'Times New Roman', serif;
+  font-size: 36px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* Result screens: win is green, lose is red, draw stays brass. Text says which, too. */
+.overlay .box.outcome.tone-win {
+  border-color: var(--heal);
+}
+
+.overlay .box.outcome.tone-lose {
+  border-color: var(--crimson);
+}
+
+.overlay .box.outcome.tone-win h2 {
+  color: var(--heal);
+}
+
+.overlay .box.outcome.tone-lose h2 {
+  color: var(--crimson);
+}
+
+.overlay .box.outcome.tone-draw h2 {
+  color: var(--brass);
+}
+
+.overlay .box.final {
+  border-width: 2px;
+  padding-block: 28px;
+}
+
 .overlay .muted {
   color: var(--muted);
 }

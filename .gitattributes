@@ -1,0 +1,10 @@
+# Normalise line endings so Prettier (endOfLine: lf) passes on every OS.
+* text=auto eol=lf
+
+# Binary assets
+*.png binary
+*.jpg binary
+*.webp binary
+*.woff2 binary
+*.ogg binary
+*.mp3 binary

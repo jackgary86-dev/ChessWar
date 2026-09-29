@@ -7,6 +7,8 @@
 import type { GameState } from '@sim/game.ts';
 import { dockView, scoreboardView } from './hud-model.ts';
 import type { DockView, PlayerCardView } from './hud-model.ts';
+import { cardClasses, tierLabel } from './card-art.ts';
+import { pieceSpriteUrl } from './sprites.ts';
 
 export interface HudActions {
   buy: (slot: number) => void;
@@ -85,19 +87,29 @@ function shopRow(dock: DockView, actions: HudActions, boughtSlot: number | undef
       );
       continue;
     }
-    const b = el('button', `card t${String(card.tier)}`);
+    const b = el('button', cardClasses(card, dock.lock.locked));
     b.type = 'button';
     b.disabled = !card.enabled;
-    b.title = card.name;
-    if (card.pips > 0) {
-      const pips = el('span', 'pips');
-      for (let i = 0; i < card.pips; i++) pips.append(el('i'));
-      b.append(pips);
-    }
+    b.title = `${card.name}, ${tierLabel(card.tier)}, ${String(card.cost)} gold${card.unaffordable ? ' (not enough gold)' : ''}`;
+    const pips = el('span', 'pips');
+    pips.title = `${String(card.pips)} of ${String(card.pipSlots)} copies owned toward a merge`;
+    for (let i = 0; i < card.pipSlots; i++) pips.append(el('i', i < card.pips ? 'on' : undefined));
+    const art = el('span', 'g');
+    const img = el('img');
+    img.src = pieceSpriteUrl(card.type, dock.side);
+    img.alt = '';
+    img.draggable = false;
+    // Fall back to the Unicode glyph if the sprite fails to load.
+    img.addEventListener('error', () => {
+      art.textContent = `${card.glyph}${VS_TEXT}`;
+    });
+    art.append(img);
     b.append(
-      el('span', 'g', `${card.glyph}${VS_TEXT}`),
+      el('span', 'tier', tierLabel(card.tier)),
+      el('span', 'cost', String(card.cost)),
+      pips,
+      art,
       el('span', 'n', card.name),
-      el('span', 'c', `${String(card.cost)}g`),
     );
     b.addEventListener('click', () => {
       actions.buy(card.slot);

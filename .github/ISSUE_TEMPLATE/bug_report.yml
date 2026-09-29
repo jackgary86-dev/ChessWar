@@ -1,0 +1,85 @@
+name: Bug report
+description: Something in Chess War does not work as it should
+title: 'Bug: '
+labels: ['bug']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. One bug per report please. A maintainer will set the severity and a milestone at the weekly triage (see `docs/TRIAGE.md`).
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Numbered steps from a fresh start, as exact as you can.
+      placeholder: |
+        1. Start a game vs AI
+        2. Buy two pawns and place them on e2 and e3
+        3. Press Fight
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected
+      description: What you thought would happen.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual
+      description: What happened instead. Paste any error text from the browser console.
+    validations:
+      required: true
+  - type: input
+    id: seed-round
+    attributes:
+      label: Seed and round
+      description: The round number when it happened and the match seed if you know it (the seed can be read from a saved match or the console). Leave blank if unknown.
+      placeholder: 'Round 4, seed 123456'
+  - type: dropdown
+    id: mode
+    attributes:
+      label: Game mode
+      options:
+        - Vs AI
+        - 2 players on one screen
+        - Online
+        - Not sure
+    validations:
+      required: true
+  - type: input
+    id: device
+    attributes:
+      label: Device and screen size
+      placeholder: 'iPhone 14, or Windows laptop 1920x1080'
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and version
+      placeholder: 'Safari 17.4, or Chrome 126'
+    validations:
+      required: true
+  - type: input
+    id: build
+    attributes:
+      label: Build or version
+      description: The version, release or preview link you were playing.
+  - type: textarea
+    id: screenshot
+    attributes:
+      label: Screenshot or recording
+      description: Drag an image or short video into this box. It helps most for visual bugs.
+  - type: dropdown
+    id: severity-guess
+    attributes:
+      label: How bad does it feel? (optional)
+      description: Your guess; the maintainer decides at triage.
+      options:
+        - Blocks me from playing
+        - Breaks a feature
+        - Small annoyance
+        - Looks wrong

@@ -105,3 +105,67 @@ export function attachBoardInput(
     if (pos) onTap(pos);
   });
 }
+
+const ARROW_STEP: Readonly<Record<string, Pos>> = {
+  ArrowLeft: { x: -1, y: 0 },
+  ArrowRight: { x: 1, y: 0 },
+  ArrowUp: { x: 0, y: -1 },
+  ArrowDown: { x: 0, y: 1 },
+};
+
+/**
+ * Keyboard cursor on the player's own board: arrow keys move it one square and
+ * stop at the edge; the first arrow key shows it on the board's first square.
+ * Returns null for any other key.
+ */
+export function moveCursor(cursor: Pos | null, side: Side, key: string): Pos | null {
+  const step = ARROW_STEP[key];
+  if (!step) return null;
+  const left = side === 0 ? 0 : BOARD.wallRightX;
+  if (!cursor) return { x: left, y: 0 };
+  const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));
+  return {
+    x: clamp(cursor.x + step.x, left, left + BOARD.width / 2 - 1),
+    y: clamp(cursor.y + step.y, 0, BOARD.height - 1),
+  };
+}
+
+/** Keys that act like a tap on the cursor square. */
+export function isActivateKey(key: string): boolean {
+  return key === 'Enter' || key === ' ';
+}
+
+/**
+ * Make the canvas keyboard-operable: Tab focuses it, arrows move the cursor
+ * (`onCursor`), Enter or Space taps the cursor square (`onTap`).
+ */
+export function attachBoardKeys(
+  canvas: HTMLCanvasElement,
+  side: () => Side,
+  getCursor: () => Pos | null,
+  onCursor: (pos: Pos | null) => void,
+  onTap: (pos: Pos) => void,
+): void {
+  canvas.tabIndex = 0;
+  canvas.setAttribute('role', 'application');
+  canvas.setAttribute(
+    'aria-label',
+    'Your board. Arrow keys move the cursor, Enter or Space selects or places a piece.',
+  );
+  canvas.addEventListener('blur', () => {
+    onCursor(null);
+  });
+  canvas.addEventListener('keydown', (event) => {
+    const moved = moveCursor(getCursor(), side(), event.key);
+    if (moved) {
+      event.preventDefault();
+      onCursor(moved);
+      return;
+    }
+    const cursor = getCursor();
+    if (cursor && isActivateKey(event.key)) {
+      event.preventDefault();
+      onTap(cursor);
+    }
+  });
+}

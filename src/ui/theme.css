@@ -1,0 +1,32 @@
+:root {
+  --ground: #14120e;
+  --panel: #1e1b15;
+  --line: #3b3529;
+  --ink: #ede5d1;
+  --muted: #a39985;
+  --brass: #d3a64d;
+  --crimson: #d65a43;
+  --portal: #a47fff;
+  --heal: #7cc977;
+  --sq-light-1: #dccca5;
+  --sq-dark-1: #9c805a;
+  --sq-light-2: #c0c6b3;
+  --sq-dark-2: #76826c;
+  --ivory: #f1e9d4;
+  --ebony: #1c1914;
+  --wall: #0b0a08;
+  --f-piece: 'Noto Sans Symbols 2', 'Segoe UI Symbol', 'Apple Symbols', 'DejaVu Sans', serif;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+}
+
+.battlefield {
+  display: block;
+  margin-inline: auto;
+  touch-action: manipulation;
+}

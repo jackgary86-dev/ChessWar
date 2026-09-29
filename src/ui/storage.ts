@@ -35,15 +35,36 @@ export function saveGame(storage: StorageLike | null, game: GameState): boolean 
   }
 }
 
+export interface SaveRead {
+  /** The saved game, or null if there is none or it is unusable. */
+  readonly game: GameState | null;
+  /** A save was found but could not be used (corrupt or from another version) and was removed. */
+  readonly discarded: boolean;
+}
+
+/** What the player is told when a save has to be thrown away. */
+export const DISCARDED_SAVE_MESSAGE =
+  'Your saved war could not be read (it is damaged or from an older version), so it was discarded.';
+
+/** Read the save; an unusable one is removed so it is not offered again. */
+export function readSave(storage: StorageLike | null): SaveRead {
+  if (!storage) return { game: null, discarded: false };
+  let text: string | null;
+  try {
+    text = storage.getItem(SAVE_KEY);
+  } catch {
+    return { game: null, discarded: false };
+  }
+  if (text === null) return { game: null, discarded: false };
+  const game = parseSave(text);
+  if (game) return { game, discarded: false };
+  clearSave(storage);
+  return { game: null, discarded: true };
+}
+
 /** The saved game, or null if there is none or it is unusable. */
 export function loadGame(storage: StorageLike | null): GameState | null {
-  if (!storage) return null;
-  try {
-    const text = storage.getItem(SAVE_KEY);
-    return text === null ? null : parseSave(text);
-  } catch {
-    return null;
-  }
+  return readSave(storage).game;
 }
 
 export function clearSave(storage: StorageLike | null): void {

@@ -12,6 +12,8 @@ import type { PieceType, Side, StarLevel } from '@sim/types.ts';
 import type { Effect } from './animation.ts';
 import type { Layout } from './layout.ts';
 import { pieceSprite } from './sprites.ts';
+import { drawFrame, drawTiles, drawWall } from './board-art.ts';
+import type { BoardPalette } from './board-art.ts';
 import { pipOffsets, starStyle } from './stars.ts';
 
 export interface DrawPiece {
@@ -55,6 +57,7 @@ export interface Theme {
   readonly crimson: string;
   readonly muted: string;
   readonly pieceFont: string;
+  readonly monoFont: string;
 }
 
 const THEME_VARS = {
@@ -71,6 +74,7 @@ const THEME_VARS = {
   crimson: '--crimson',
   muted: '--muted',
   pieceFont: '--f-piece',
+  monoFont: '--f-mono',
 } as const;
 
 export function readTheme(element: Element): Theme {
@@ -88,6 +92,7 @@ export function readTheme(element: Element): Theme {
     crimson: get(THEME_VARS.crimson),
     muted: get(THEME_VARS.muted),
     pieceFont: get(THEME_VARS.pieceFont),
+    monoFont: get(THEME_VARS.monoFont),
   };
 }
 
@@ -151,28 +156,8 @@ export function prefersReducedMotion(): boolean {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
-function drawSquares(ctx: CanvasRenderingContext2D, layout: Layout, theme: Theme): void {
-  const { cell } = layout;
-  for (let x = 0; x < BOARD.width; x++) {
-    const board = x < SECOND_BOARD_X ? 0 : 1;
-    for (let y = 0; y < BOARD.height; y++) {
-      const dark = (x + y) % 2 === 1;
-      ctx.fillStyle = dark ? theme.sqDark[board] : theme.sqLight[board];
-      const at = layout.toScreen({ x, y });
-      ctx.fillRect(at.x, at.y, cell, cell);
-    }
-  }
-}
-
-function drawWall(ctx: CanvasRenderingContext2D, layout: Layout, theme: Theme): void {
-  const first = layout.toScreen({ x: BOARD.wallLeftX, y: 0 });
-  const second = layout.toScreen({ x: BOARD.wallRightX, y: 0 });
-  ctx.fillStyle = theme.wall;
-  if (layout.stacked) {
-    ctx.fillRect(0, second.y + layout.cell, layout.width, layout.wallGap);
-  } else {
-    ctx.fillRect(first.x + layout.cell, 0, layout.wallGap, layout.height);
-  }
+function boardPalette(theme: Theme): BoardPalette {
+  return { light: theme.sqLight, dark: theme.sqDark, wall: theme.wall, trim: theme.brass };
 }
 
 function drawPortals(
@@ -214,7 +199,7 @@ function drawPortals(
 
 function drawNotation(ctx: CanvasRenderingContext2D, layout: Layout, theme: Theme): void {
   const { cell } = layout;
-  ctx.font = `600 ${String(Math.round(cell * LABEL_SIZE))}px ${theme.pieceFont}`;
+  ctx.font = `700 ${String(Math.round(cell * LABEL_SIZE))}px ${theme.monoFont}`;
   ctx.textBaseline = 'top';
   ctx.textAlign = 'left';
   const pad = cell * LABEL_PAD;
@@ -442,10 +427,12 @@ export function drawScene(
   reducedMotion: boolean,
 ): void {
   ctx.clearRect(0, 0, layout.width, layout.height);
-  drawSquares(ctx, layout, theme);
-  drawWall(ctx, layout, theme);
+  const palette = boardPalette(theme);
+  drawTiles(ctx, layout, palette);
+  drawWall(ctx, layout, palette);
   drawPortals(ctx, layout, theme, timeMs, reducedMotion);
   drawNotation(ctx, layout, theme);
+  drawFrame(ctx, layout, palette);
   if (scene.highlights) drawHighlights(ctx, layout, theme, scene.highlights);
   if (scene.selected) drawSelection(ctx, layout, scene.selected, theme.brass);
   if (scene.dropSquare) drawSelection(ctx, layout, scene.dropSquare, theme.heal);

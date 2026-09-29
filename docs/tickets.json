@@ -1,0 +1,698 @@
+[
+ {
+  "title": "Project scaffold: Vite + TypeScript + Vitest + CI",
+  "milestone": "M1 Game logic core",
+  "labels": [
+   "chore",
+   "setup"
+  ],
+  "body": "Set up the repo for the production build.\n\n- Vite + TypeScript (strict), ESLint + Prettier, Vitest\n- Folder layout from `docs/CODER_PROMPT.md` §2 (`src/sim`, `src/ui`, `tests`)\n- npm scripts: `dev`, `build`, `test`, `lint`, `sim`\n- GitHub Actions workflow running lint, test and build on every push and PR\n- `.gitignore` for node_modules, dist, .env\n\n**Done when:** a fresh clone runs `npm ci && npm test && npm run build` green, and CI passes on the PR.",
+  "file": "tickets/001-project-scaffold-vite-typescript-vitest-ci.md"
+ },
+ {
+  "title": "Balance data module (data.ts)",
+  "milestone": "M1 Game logic core",
+  "labels": [
+   "feature",
+   "sim"
+  ],
+  "body": "Single source of truth for every balance number (spec §3.2, §3.4).\n\n- Piece stats: cost, tier, HP, ATK, action speed\n- Star multipliers (HP 1/1.9/3.5, ATK 1/1.8/3.3) and ability values\n- Pool sizes, tier odds per level, XP table, income/interest/streak values, fight limits (26 idle ticks, 220 max)\n\n**Done when:** no balance number appears anywhere else in `src/`.",
+  "file": "tickets/002-balance-data-module-data-ts.md"
+ },
+ {
+  "title": "Seeded RNG",
+  "milestone": "M1 Game logic core",
+  "labels": [
+   "feature",
+   "sim"
+  ],
+  "body": "Deterministic RNG (e.g. mulberry32) carried in game state. No `Math.random` inside `src/sim`.\n\n- `next()`, `int(n)`, `shuffle(arr)`\n- Serializable state so a match can be saved and resumed\n\n**Done when:** same seed gives the same sequence; tested.",
+  "file": "tickets/003-seeded-rng.md"
+ },
+ {
+  "title": "Board geometry: wall, portals and move generation",
+  "milestone": "M1 Game logic core",
+  "labels": [
+   "feature",
+   "sim"
+  ],
+  "body": "Implement spec §3.1 and the movement column of §3.2.\n\n- 16×8 world grid, wall between x=7 and x=8, portal squares (7,2) (7,5) (8,2) (8,5)\n- A step across the wall is legal only if it starts or ends on a portal square; sliders check every step\n- Knights leap the wall anywhere\n- Move generation for Pawn (forward / diagonal-forward by side), Knight, Bishop, Rook, Queen\n\n**Tests:** rook h5→i5 blocked; rook h6 slides through to i6 and beyond; bishop g7→h6→i5 legal; knight g4→i5 legal; pawns only move toward the enemy.",
+  "file": "tickets/004-board-geometry-wall-portals-and-move-generation.md"
+ },
+ {
+  "title": "Strike generation",
+  "milestone": "M1 Game logic core",
+  "labels": [
+   "feature",
+   "sim"
+  ],
+  "body": "Which enemies a piece can hit from a square.\n\n- Pawn: the 3 squares ahead (side-aware), respecting the wall\n- Knight: knight squares\n- Bishop / Rook / Queen: along their lines, up to 3 squares, first piece blocks line of sight\n\n**Tests:** range cap of 3; line of sight blocked by friend or foe; wall blocks non-portal strikes.",
+  "file": "tickets/005-strike-generation.md"
+ },
+ {
+  "title": "Battle simulation tick loop",
+  "milestone": "M1 Game logic core",
+  "labels": [
+   "feature",
+   "sim"
+  ],
+  "body": "Spec §3.3.\n\n- Build battle units from both boards with star-scaled stats\n- Cooldowns with random first action (seeded); shuffled act order per tick\n- Strike lowest-HP enemy in range; damage = round(ATK × mult × (1 − armor)), min 1\n- On a kill the attacker moves onto the target's square\n- Emit an event list (move, strike, heal, death, portal-cross) for the renderer and log\n\n**Done when:** same seed + armies produce an identical event log (test).",
+  "file": "tickets/006-battle-simulation-tick-loop.md"
+ },
+ {
+  "title": "Pathfinding: BFS on each piece's own move graph",
+  "milestone": "M1 Game logic core",
+  "labels": [
+   "feature",
+   "sim"
+  ],
+  "body": "When no enemy is in range, move along the shortest path (in the piece's own chess moves, current occupancy) to the nearest square it could strike from.\n\n- Fallback: legal move that most reduces wall-aware king-step distance to the nearest enemy\n- Otherwise wait 1 tick\n\n**Tests:** a rook routes through a portal row; a bishop crosses via a portal diagonal; a blocked pawn waits.",
+  "file": "tickets/007-pathfinding-bfs-on-each-piece-s-own-move-graph.md"
+ },
+ {
+  "title": "Star abilities (2★ / 3★)",
+  "milestone": "M1 Game logic core",
+  "labels": [
+   "feature",
+   "sim"
+  ],
+  "body": "- Pawn Shield Wall: 15% / 30% less damage with an orthogonally adjacent friend\n- Knight Fork: also hits 1 / all other enemies on its knight squares\n- Bishop Blessing: heals most wounded ally for 60% / 120% ATK, never above max HP\n- Rook Fortress: 20% / 35% less damage\n- Queen Pierce: hits the enemy directly behind the target for 50% / 100%\n\n**Done when:** each ability has a unit test at 1★ (off), 2★ and 3★.",
+  "file": "tickets/008-star-abilities-2-3.md"
+ },
+ {
+  "title": "Fight end conditions and material tiebreak",
+  "milestone": "M1 Game logic core",
+  "labels": [
+   "feature",
+   "sim"
+  ],
+  "body": "- Ends when one side has no pieces\n- Ends after 26 ticks with no damage, or at 220 ticks: winner by remaining material Σ cost × 3^(stars−1) × hp/maxHp; exact tie is a draw\n\n**Tests:** every random battle in a 1,000-battle fuzz ends within 220 ticks.",
+  "file": "tickets/009-fight-end-conditions-and-material-tiebreak.md"
+ },
+ {
+  "title": "Shared piece pool and shop rolling",
+  "milestone": "M2 Economy, shop and AI",
+  "labels": [
+   "feature",
+   "economy"
+  ],
+  "body": "Spec §3.4.\n\n- Pool shared by both players: Pawn 30, Knight 18, Bishop 18, Rook 14, Queen 9\n- 5-slot shop rolled with tier odds by level; empty tier falls back to the nearest tier with stock\n- Reroll (2g) returns unbought cards to the pool; free roll each round unless locked; lock lasts one round\n\n**Test:** total piece count (pool + shops + benches + boards) is conserved across buy/sell/reroll.",
+  "file": "tickets/010-shared-piece-pool-and-shop-rolling.md"
+ },
+ {
+  "title": "Buy, sell, bench and 3-copy merging",
+  "milestone": "M2 Economy, shop and AI",
+  "labels": [
+   "feature",
+   "economy"
+  ],
+  "body": "- 8-slot bench; buy blocked on a full bench unless the buy completes a merge\n- 3 same type + stars → one piece a star higher, kept where a copy stood (board copy preferred); merges chain to 3★\n- Sell refunds cost × 3^(stars−1) and returns that many copies to the pool\n\n**Tests:** 3×1★ → 2★; 9×1★ bought in sequence → 3★; full-bench merge buy; merged piece keeps its board square.",
+  "file": "tickets/011-buy-sell-bench-and-3-copy-merging.md"
+ },
+ {
+  "title": "Economy: income, interest, streaks, XP and levels",
+  "milestone": "M2 Economy, shop and AI",
+  "labels": [
+   "feature",
+   "economy"
+  ],
+  "body": "- Round 1: 3 gold. Then base min(5, round+2) + interest floor(gold/10) (max 5) + streak bonus (2–3:+1, 4–5:+2, 6+:+3) + 1 for last-round win\n- Level 2–8; board cap = level; XP needs 2/4/6/10/14/20; +1 XP per round from round 2; Buy XP 4g for 4 XP\n\n**Tests:** income breakdown, interest cap, streak bonus, level-ups, board cap enforced.",
+  "file": "tickets/012-economy-income-interest-streaks-xp-and-levels.md"
+ },
+ {
+  "title": "Round flow state machine and HP damage",
+  "milestone": "M2 Economy, shop and AI",
+  "labels": [
+   "feature",
+   "sim"
+  ],
+  "body": "`prep → handoff → combat → result → next round | game over` (spec §3.5).\n\n- Player HP 50; loser takes 2 + surviving winner stars + floor(round/4); draw costs both 2\n- Supports vs-AI and local 2-player modes\n\n**Done when:** a full match can be played headlessly through the state machine.",
+  "file": "tickets/013-round-flow-state-machine-and-hp-damage.md"
+ },
+ {
+  "title": "AI opponent: shopping, leveling and placement",
+  "milestone": "M2 Economy, shop and AI",
+  "labels": [
+   "feature",
+   "ai"
+  ],
+  "body": "Spec §3.6. Same rules as a human, no hidden information.\n\n- Buy matching copies first; level toward min(8, 2 + floor((round+1)/2)); fill army with best affordable piece; keep 10g for interest from round 6; reroll up to twice with 16+ gold from round 5\n- Formation: pawns on portal lanes, knights behind, rooks and queen middle, bishops back\n- Difficulty parameter: easy / normal / hard",
+  "file": "tickets/014-ai-opponent-shopping-leveling-and-placement.md"
+ },
+ {
+  "title": "Headless balance runner (npm run sim)",
+  "milestone": "M2 Economy, shop and AI",
+  "labels": [
+   "feature",
+   "tooling"
+  ],
+  "body": "`npm run sim -- --games 500 [--seed N]` plays AI-vs-AI matches and prints:\n\n- win rate by side (target: neither above 55%)\n- average match length in rounds\n- how often each piece and star level appears in winning armies\n\nAdd a CI test running 200 mirrored games that fails above 55% for either side.",
+  "file": "tickets/015-headless-balance-runner-npm-run-sim.md"
+ },
+ {
+  "title": "Balance pass 1",
+  "milestone": "M2 Economy, shop and AI",
+  "labels": [
+   "balance"
+  ],
+  "body": "Run `npm run sim` and post results in this issue. Propose at least 3 number changes in `data.ts` backed by the data (piece over/under-performing, match length, economy pacing). Apply the agreed changes in a PR.",
+  "file": "tickets/016-balance-pass-1.md"
+ },
+ {
+  "title": "Canvas renderer: boards, wall, portals, pieces",
+  "milestone": "M3 UI",
+  "labels": [
+   "feature",
+   "ui"
+  ],
+  "body": "- Two boards (warm squares for Ivory, sage for Ebony), wall gap, pulsing portal squares and bridges, a–p / 1–8 notation\n- Pieces drawn with ♟♞♝♜♛ + U+FE0E in Noto Sans Symbols 2, outline, shadow, stars, HP bar in combat\n- Responsive: side-by-side on desktop, stacked vertically under ~620px with input mapping following the rotation\n- HiDPI crisp; colors from CSS custom properties; respects prefers-reduced-motion",
+  "file": "tickets/017-canvas-renderer-boards-wall-portals-pieces.md"
+ },
+ {
+  "title": "Combat animation, effects and speed controls",
+  "milestone": "M3 UI",
+  "labels": [
+   "feature",
+   "ui"
+  ],
+  "body": "Drive animation from the sim's event list.\n\n- Smooth moves, knight hop arc, strike lines in the attacker's color, floating damage/heal numbers, death ring + fade\n- 1× / 2× / 4× speed and Skip to result",
+  "file": "tickets/018-combat-animation-effects-and-speed-controls.md"
+ },
+ {
+  "title": "HUD: scoreboard, shop, bench, actions",
+  "milestone": "M3 UI",
+  "labels": [
+   "feature",
+   "ui"
+  ],
+  "body": "- Scoreboard: HP bar, gold, level, XP, streak for both players (gold hidden from the other player during hot-seat prep)\n- Shop cards with tier-colored edge, cost, pips for copies owned; tier odds line\n- Reroll, Lock, Buy XP, Sell (shows refund), Fight/Ready\n- Bench of 8 slots and an \"On board X/level\" counter",
+  "file": "tickets/019-hud-scoreboard-shop-bench-actions.md"
+ },
+ {
+  "title": "Tap-to-place piece placement",
+  "milestone": "M3 UI",
+  "labels": [
+   "feature",
+   "ui"
+  ],
+  "body": "Tap a piece (bench or board), then tap a square on your own board or a bench slot. Tapping two pieces swaps them. Highlight open squares while a bench piece is selected. Block placement past the board cap with a clear message. Works with touch.",
+  "file": "tickets/020-tap-to-place-piece-placement.md"
+ },
+ {
+  "title": "Overlays and hot-seat privacy",
+  "milestone": "M3 UI",
+  "labels": [
+   "feature",
+   "ui"
+  ],
+  "body": "- Start screen (vs AI / 2 players on one screen)\n- Handoff screen before each player's prep in hot-seat; opponent's board fogged during prep\n- Round result with damage breakdown; game-over screen with New war",
+  "file": "tickets/021-overlays-and-hot-seat-privacy.md"
+ },
+ {
+  "title": "Battle log in chess notation and field manual",
+  "milestone": "M3 UI",
+  "labels": [
+   "feature",
+   "ui"
+  ],
+  "body": "- Log kills (e.g. `♞ c3×e4 Bishop falls`), portal crossings, merges and round results\n- Field manual panel listing every piece's cost, stats, movement and star ability, generated from `data.ts`",
+  "file": "tickets/022-battle-log-in-chess-notation-and-field-manual.md"
+ },
+ {
+  "title": "Drag-and-drop placement",
+  "milestone": "M4 Polish",
+  "labels": [
+   "feature",
+   "ui"
+  ],
+  "body": "Pointer-event drag between bench and board (mouse and touch), with a ghost piece and drop highlighting. Tap-to-place stays as the fallback.",
+  "file": "tickets/023-drag-and-drop-placement.md"
+ },
+ {
+  "title": "Save and resume a match",
+  "milestone": "M4 Polish",
+  "labels": [
+   "feature"
+  ],
+  "body": "Save the full game state (including RNG state) to localStorage at the start of each prep phase. Offer Continue on the start screen. Wrap every storage call in try/catch and play normally if storage is unavailable.",
+  "file": "tickets/024-save-and-resume-a-match.md"
+ },
+ {
+  "title": "Sound effects with mute toggle",
+  "milestone": "M4 Polish",
+  "labels": [
+   "feature",
+   "ui"
+  ],
+  "body": "Buy, merge, strike, death, portal crossing, round win/loss. Audio starts only after a user interaction. Mute toggle remembered per browser.",
+  "file": "tickets/025-sound-effects-with-mute-toggle.md"
+ },
+ {
+  "title": "Deploy to the Game Portal",
+  "milestone": "M4 Polish",
+  "labels": [
+   "chore",
+   "deploy"
+  ],
+  "body": "- Document deploying `dist/` as static files\n- Test on staging (NixonExpress) before promoting to the live Game Portal server\n- Add a deploy section to the README",
+  "file": "tickets/026-deploy-to-the-game-portal.md"
+ },
+ {
+  "title": "Online 1v1: authoritative WebSocket server",
+  "milestone": "M5 Online",
+  "labels": [
+   "feature",
+   "net"
+  ],
+  "body": "Small Node + WebSocket server that owns the RNG seed, pool and battle sim using the shared `src/sim` code unchanged.\n\n- Clients send intents only: buy, sell, reroll, lock, buyXP, place, ready\n- Server validates every intent and never trusts client state\n- Server sends state updates and the battle event list",
+  "file": "tickets/027-online-1v1-authoritative-websocket-server.md"
+ },
+ {
+  "title": "Online lobby: room codes and reconnect",
+  "milestone": "M5 Online",
+  "labels": [
+   "feature",
+   "net"
+  ],
+  "body": "Create/join a room with a short code, ready-up, and rejoin a match after a disconnect (state resent on reconnect). Handle a player leaving (forfeit after a timeout).",
+  "file": "tickets/028-online-lobby-room-codes-and-reconnect.md"
+ },
+ {
+  "title": "Client network layer and online mode UI",
+  "milestone": "M5 Online",
+  "labels": [
+   "feature",
+   "net",
+   "ui"
+  ],
+  "body": "Add an Online mode to the start screen. Route shop/placement actions to the server when online, render server-sent state and battle events with the existing renderer, show connection status.",
+  "file": "tickets/029-client-network-layer-and-online-mode-ui.md"
+ },
+ {
+  "title": "Art direction and style guide",
+  "milestone": "Art",
+  "labels": [
+   "art",
+   "direction"
+  ],
+  "body": "Decide the game's look before any final assets are made. Everything else in the Art milestone depends on this.\n\n- Pick a rendering style (e.g. flat vector, painted 2D, pixel art, or pre-rendered 3D) and show 2–3 mood boards\n- Lock the palette as design tokens (Ivory side, Ebony side, portal, brass accent, UI neutrals, tier colors T1–T4)\n- Typography: display face for the logo and headings, body face, mono face for notation and numbers\n- Rules for readability: a piece must be recognizable at 28 px on a phone\n\n**Done when:** `docs/art/STYLE_GUIDE.md` is merged with palette, fonts, sample piece and sample board square.",
+  "file": "tickets/030-art-direction-and-style-guide.md"
+ },
+ {
+  "title": "Chess piece sprites: 5 pieces × 2 sides",
+  "milestone": "Art",
+  "labels": [
+   "art",
+   "sprites"
+  ],
+  "body": "Final art for Pawn, Knight, Bishop, Rook and Queen in Ivory and Ebony.\n\n- SVG (preferred) or PNG at 1×, 2×, 3×; transparent background; consistent base line and bounding box\n- Readable at 28 px and crisp at 128 px\n- Ivory and Ebony must both read clearly on both board colors\n- Replace the Unicode glyphs in the renderer behind a single `pieceSprite(type, side)` function\n\n**Done when:** all 10 sprites are in `assets/pieces/` and render in-game.",
+  "file": "tickets/031-chess-piece-sprites-5-pieces-2-sides.md"
+ },
+ {
+  "title": "Star-level visuals (1★, 2★, 3★)",
+  "milestone": "Art",
+  "labels": [
+   "art",
+   "sprites"
+  ],
+  "body": "Make star level obvious at a glance, not only from the ★ row.\n\n- Treatment per level (e.g. bronze / silver / gold trim, plinth, glow)\n- Star pips under the piece that stay legible at small sizes\n- Works for both sides and all 5 pieces",
+  "file": "tickets/032-star-level-visuals-1-2-3.md"
+ },
+ {
+  "title": "Board tiles, wall and notation",
+  "milestone": "Art",
+  "labels": [
+   "art",
+   "environment"
+  ],
+  "body": "- Light and dark squares for each board (Ivory board warm, Ebony board cool), tileable and subtle so pieces stay readable\n- The wall between the boards, with its end caps\n- File/rank notation style (a–p, 1–8)\n- Optional board frame and table surface around the battlefield\n- Must also work in the stacked (vertical) phone layout",
+  "file": "tickets/033-board-tiles-wall-and-notation.md"
+ },
+ {
+  "title": "Portal squares and bridge",
+  "milestone": "Art",
+  "labels": [
+   "art",
+   "environment",
+   "vfx"
+  ],
+  "body": "The signature element of the game.\n\n- Portal square art for (h6, h3, i6, i3) and the bridge across the wall\n- Idle loop animation (sprite sheet or shader-friendly layers), plus a still frame for reduced motion\n- A short burst when a piece passes through",
+  "file": "tickets/034-portal-squares-and-bridge.md"
+ },
+ {
+  "title": "Combat VFX: strikes, damage, death, heal",
+  "milestone": "Art",
+  "labels": [
+   "art",
+   "vfx"
+  ],
+  "body": "- Strike effect per piece type (pawn jab, knight leap impact, bishop / rook / queen line strike), tinted by side\n- Hit flash, floating damage and heal number style\n- Death effect (piece shatters or topples and fades)\n- Ability effects: Shield Wall, Fork, Blessing, Fortress, Pierce\n- Deliver as sprite sheets with frame timings, or as parameters for canvas effects",
+  "file": "tickets/035-combat-vfx-strikes-damage-death-heal.md"
+ },
+ {
+  "title": "Merge and level-up effects",
+  "milestone": "Art",
+  "labels": [
+   "art",
+   "vfx",
+   "ui"
+  ],
+  "body": "- Effect when 3 copies merge into a higher star level (on bench and on board)\n- Player level-up effect in the HUD\n- Shop buy feedback",
+  "file": "tickets/036-merge-and-level-up-effects.md"
+ },
+ {
+  "title": "Shop cards and tier frames",
+  "milestone": "Art",
+  "labels": [
+   "art",
+   "ui"
+  ],
+  "body": "- Card frame for each tier (T1–T4) with cost badge and piece art\n- States: normal, hover, unaffordable, bought/empty, locked shop\n- Pips showing copies already owned",
+  "file": "tickets/037-shop-cards-and-tier-frames.md"
+ },
+ {
+  "title": "HUD and UI kit",
+  "milestone": "Art",
+  "labels": [
+   "art",
+   "ui"
+  ],
+  "body": "- Buttons (primary, secondary, disabled, toggle), panels, scoreboard with HP bar, gold, level/XP bar, streak badge\n- Bench slots (empty, filled, selected), speed control, tooltips\n- Icon set: gold, XP, HP, reroll, lock, sell, sound on/off, settings\n- Provide as SVG + a component sheet matching the style guide tokens",
+  "file": "tickets/038-hud-and-ui-kit.md"
+ },
+ {
+  "title": "Logo, title screen and overlays",
+  "milestone": "Art",
+  "labels": [
+   "art",
+   "ui",
+   "branding"
+  ],
+  "body": "- Chess War logo (wordmark + small mark)\n- Start screen composition\n- Handoff screen, round result and game-over screens, win and lose variants",
+  "file": "tickets/039-logo-title-screen-and-overlays.md"
+ },
+ {
+  "title": "App icon and favicon",
+  "milestone": "Art",
+  "labels": [
+   "art",
+   "branding"
+  ],
+  "body": "Favicon (16, 32, 48 px) and app icons (180, 192, 512 px, plus maskable) from the logo mark. Add the web manifest entries.",
+  "file": "tickets/040-app-icon-and-favicon.md"
+ },
+ {
+  "title": "Art integration and asset pipeline",
+  "milestone": "Art",
+  "labels": [
+   "art",
+   "tooling"
+  ],
+  "body": "- `assets/` folder layout and naming conventions\n- Sprite atlas or SVG sprite build step in Vite; preload with a loading screen\n- Keep the Unicode-glyph renderer as a fallback if assets fail to load\n- Budget: total art download under 2 MB on first load\n\n**Done when:** swapping an asset file updates the game with no code changes.",
+  "file": "tickets/041-art-integration-and-asset-pipeline.md"
+ },
+ {
+  "title": "Bug report template and triage process",
+  "milestone": "QA and bug checks",
+  "labels": [
+   "qa",
+   "process"
+  ],
+  "body": "- Add `.github/ISSUE_TEMPLATE/bug_report.yml`: steps to reproduce, expected vs actual, seed/round, device and browser, screenshot\n- Severity labels: `sev:blocker`, `sev:major`, `sev:minor`, `sev:cosmetic`\n- Weekly triage: every new bug gets a severity and a milestone",
+  "file": "tickets/042-bug-report-template-and-triage-process.md"
+ },
+ {
+  "title": "Bug check: battle simulation fuzz test",
+  "milestone": "QA and bug checks",
+  "labels": [
+   "qa",
+   "sim"
+  ],
+  "body": "Run 10,000 random armies through the sim (seeded).\n\n- [ ] Every battle ends within 220 ticks\n- [ ] No piece ever stands on another piece or outside the grid\n- [ ] No non-knight crosses the wall except via a portal square\n- [ ] HP never above max or below 0; heals never exceed max\n- [ ] Same seed replays identically\n\nFile a bug for each failure with its seed.",
+  "file": "tickets/043-bug-check-battle-simulation-fuzz-test.md"
+ },
+ {
+  "title": "Bug check: economy and shop invariants",
+  "milestone": "QA and bug checks",
+  "labels": [
+   "qa",
+   "economy"
+  ],
+  "body": "- [ ] Pool count conserved through buy, sell, reroll, lock and merge (property test)\n- [ ] Gold never negative; buy blocked when unaffordable\n- [ ] Board never exceeds level; bench never exceeds 8\n- [ ] Merges chain correctly and never lose or duplicate a piece\n- [ ] Income, interest and streak math matches the spec for 30 rounds",
+  "file": "tickets/044-bug-check-economy-and-shop-invariants.md"
+ },
+ {
+  "title": "Bug check: UI across browsers and devices",
+  "milestone": "QA and bug checks",
+  "labels": [
+   "qa",
+   "ui"
+  ],
+  "body": "Play one full match on each and log issues:\n\n- [ ] Chrome, Firefox, Edge on Windows\n- [ ] Safari on iPhone, Chrome on Android (portrait and landscape)\n- [ ] Desktop at 1280 px and 1920 px\n- [ ] No horizontal page scroll; board fits; taps land on the right square in both layouts\n- [ ] No console errors",
+  "file": "tickets/045-bug-check-ui-across-browsers-and-devices.md"
+ },
+ {
+  "title": "Bug check: hot-seat privacy and round flow",
+  "milestone": "QA and bug checks",
+  "labels": [
+   "qa",
+   "ui"
+  ],
+  "body": "- [ ] The other player's board, bench, shop and gold stay hidden during prep\n- [ ] Handoff screen shows before every prep\n- [ ] Skip, speed change and result screens never get stuck or double-advance a round\n- [ ] Game over triggers on 0 HP for either or both players",
+  "file": "tickets/046-bug-check-hot-seat-privacy-and-round-flow.md"
+ },
+ {
+  "title": "Bug check: save/resume and storage failures",
+  "milestone": "QA and bug checks",
+  "labels": [
+   "qa"
+  ],
+  "body": "- [ ] Resume restores gold, shop, bench, board, pool, RNG and round exactly\n- [ ] Corrupt or old-version save is discarded safely with a message\n- [ ] Game plays normally in a private window or with storage blocked",
+  "file": "tickets/047-bug-check-save-resume-and-storage-failures.md"
+ },
+ {
+  "title": "Bug check: performance",
+  "milestone": "QA and bug checks",
+  "labels": [
+   "qa",
+   "performance"
+  ],
+  "body": "- [ ] 60 fps during combat with 16 pieces on a mid-range phone\n- [ ] `npm run sim -- --games 500` finishes in under 60 s\n- [ ] First load under 3 s on home Wi-Fi; no memory growth over a 20-round match",
+  "file": "tickets/048-bug-check-performance.md"
+ },
+ {
+  "title": "Bug check: accessibility",
+  "milestone": "QA and bug checks",
+  "labels": [
+   "qa",
+   "a11y"
+  ],
+  "body": "- [ ] All controls reachable and usable by keyboard with visible focus\n- [ ] Text contrast meets WCAG AA\n- [ ] Sides distinguishable without relying on color alone\n- [ ] Reduced-motion setting respected",
+  "file": "tickets/049-bug-check-accessibility.md"
+ },
+ {
+  "title": "Bug check: online desync and cheating",
+  "milestone": "QA and bug checks",
+  "labels": [
+   "qa",
+   "net"
+  ],
+  "body": "- [ ] Forged or out-of-turn intents (extra gold, over board cap, other player's pieces) are rejected by the server\n- [ ] Both clients show identical battle results\n- [ ] Disconnect and reconnect mid-prep and mid-battle recovers state\n- [ ] Two rooms at once never share state",
+  "file": "tickets/050-bug-check-online-desync-and-cheating.md"
+ },
+ {
+  "title": "CI build artifacts",
+  "milestone": "Demo and artifacts",
+  "labels": [
+   "ci",
+   "artifacts"
+  ],
+  "body": "GitHub Actions uploads `dist/` as a downloadable build artifact on every PR and on main, named with the commit SHA. Keep 14 days.",
+  "file": "tickets/051-ci-build-artifacts.md"
+ },
+ {
+  "title": "Preview deploy for every PR",
+  "milestone": "Demo and artifacts",
+  "labels": [
+   "ci",
+   "artifacts"
+  ],
+  "body": "Deploy each PR build to a preview URL on the staging box (NixonExpress), comment the link on the PR, remove it when the PR closes.",
+  "file": "tickets/052-preview-deploy-for-every-pr.md"
+ },
+ {
+  "title": "Keep the shareable prototype artifact in sync",
+  "milestone": "Demo and artifacts",
+  "labels": [
+   "artifacts"
+  ],
+  "body": "The single-file `prototype/chess-war.html` (also published as a Claude artifact) stays playable. Update it when core rules change, until the production build replaces it. Note the rules version at the top of the file.",
+  "file": "tickets/053-keep-the-shareable-prototype-artifact-in-sync.md"
+ },
+ {
+  "title": "Release artifacts: versioned zip and changelog",
+  "milestone": "Demo and artifacts",
+  "labels": [
+   "artifacts",
+   "release"
+  ],
+  "body": "Tag releases `vX.Y.Z`; a workflow attaches `chess-war-vX.Y.Z.zip` (static build) to the GitHub Release. Maintain `CHANGELOG.md`.",
+  "file": "tickets/054-release-artifacts-versioned-zip-and-changelog.md"
+ },
+ {
+  "title": "Playable demo build",
+  "milestone": "Demo and artifacts",
+  "labels": [
+   "demo"
+  ],
+  "body": "A short, polished slice for showing people: vs-AI only, 5 rounds, a guided first round (tooltips for shop, placement, portals, merging), and an end screen inviting a full game. Toggle via a `?demo` URL flag or build flag.",
+  "file": "tickets/055-playable-demo-build.md"
+ },
+ {
+  "title": "Demo media: GIFs, screenshots and trailer",
+  "milestone": "Demo and artifacts",
+  "labels": [
+   "demo",
+   "art"
+  ],
+  "body": "- 3 GIFs: a portal crossing, a 3★ merge, a full fight at 2×\n- 5 screenshots (desktop and phone)\n- 30–60 s gameplay trailer\n- Add GIFs to the README",
+  "file": "tickets/056-demo-media-gifs-screenshots-and-trailer.md"
+ },
+ {
+  "title": "Demo day script",
+  "milestone": "Demo and artifacts",
+  "labels": [
+   "demo"
+  ],
+  "body": "A 5-minute walkthrough for showing Chess War to friends: pitch line, one round played live, key mechanics to point out, and 3 feedback questions to ask.",
+  "file": "tickets/057-demo-day-script.md"
+ },
+ {
+  "title": "Alpha gate checker",
+  "milestone": "Alpha",
+  "labels": [
+   "release",
+   "checker"
+  ],
+  "body": "Alpha = feature-complete core, played by the two admins.\n\n- [ ] M1 and M2 closed; M3 UI playable end to end\n- [ ] All M1–M2 bug checks pass\n- [ ] No open `sev:blocker`\n- [ ] vs AI and hot-seat both finish a full match\n- [ ] Style guide merged (Art)\n- [ ] Build deployed to staging\n\nClose this issue to declare Alpha.",
+  "file": "tickets/058-alpha-gate-checker.md"
+ },
+ {
+  "title": "Alpha playtest: 10 internal matches",
+  "milestone": "Alpha",
+  "labels": [
+   "release",
+   "playtest"
+  ],
+  "body": "Nixon and Connor play 10 matches (5 vs AI, 5 hot-seat) on staging. File bugs with seeds. Record: match length, favourite and least-used pieces, confusing moments.",
+  "file": "tickets/059-alpha-playtest-10-internal-matches.md"
+ },
+ {
+  "title": "Alpha feedback review and fix list",
+  "milestone": "Alpha",
+  "labels": [
+   "release"
+  ],
+  "body": "Group Alpha feedback into must-fix for Beta, nice-to-have and won't-fix. Create or link issues for each must-fix.",
+  "file": "tickets/060-alpha-feedback-review-and-fix-list.md"
+ },
+ {
+  "title": "Beta gate checker",
+  "milestone": "Beta",
+  "labels": [
+   "release",
+   "checker"
+  ],
+  "body": "Beta = content complete with final art, opened to outside testers.\n\n- [ ] M3 and M4 closed; final piece, board and portal art in game\n- [ ] All Alpha must-fix issues closed\n- [ ] Browser/device, save, performance and accessibility bug checks pass\n- [ ] No open `sev:blocker` or `sev:major`\n- [ ] Balance: neither side above 55% over 500 sim games\n\nClose this issue to declare Beta.",
+  "file": "tickets/061-beta-gate-checker.md"
+ },
+ {
+  "title": "Beta test with 5–10 outside players",
+  "milestone": "Beta",
+  "labels": [
+   "release",
+   "playtest"
+  ],
+  "body": "Share the staging build with friends. Provide a short feedback form (fun 1–5, clarity 1–5, bugs, best moment, worst moment). Run for 2 weeks.",
+  "file": "tickets/062-beta-test-with-5-10-outside-players.md"
+ },
+ {
+  "title": "Balance pass 2 from Beta data",
+  "milestone": "Beta",
+  "labels": [
+   "release",
+   "balance"
+  ],
+  "body": "Combine Beta feedback with `npm run sim` results; adjust `data.ts`; re-run bug checks for sim and economy.",
+  "file": "tickets/063-balance-pass-2-from-beta-data.md"
+ },
+ {
+  "title": "Onboarding and tutorial polish",
+  "milestone": "Beta",
+  "labels": [
+   "release",
+   "ui"
+  ],
+  "body": "Use Beta feedback to fix the top 3 confusing moments (likely portals, merging, board cap). Add first-round tooltips if not already in the demo build.",
+  "file": "tickets/064-onboarding-and-tutorial-polish.md"
+ },
+ {
+  "title": "Launch gate checker",
+  "milestone": "Launch",
+  "labels": [
+   "release",
+   "checker"
+  ],
+  "body": "- [ ] Beta must-fix issues closed; no open `sev:blocker` or `sev:major`\n- [ ] Full bug-check pass on the release candidate\n- [ ] Release `v1.0.0` tagged with zip artifact and changelog\n- [ ] Rollback plan tested\n- [ ] Logo, favicon and title screen final\n- [ ] Connor signs off on the live server deploy\n\nClose this issue to launch.",
+  "file": "tickets/065-launch-gate-checker.md"
+ },
+ {
+  "title": "Deploy v1.0 to the live Game Portal",
+  "milestone": "Launch",
+  "labels": [
+   "release",
+   "deploy"
+  ],
+  "body": "Promote the tested staging build to the live Game Portal server. Verify with a full match on desktop and phone after deploy.",
+  "file": "tickets/066-deploy-v1-0-to-the-live-game-portal.md"
+ },
+ {
+  "title": "Rollback plan",
+  "milestone": "Launch",
+  "labels": [
+   "release",
+   "deploy"
+  ],
+  "body": "Keep the previous release zip on the live server; document the one-command rollback; test it once on staging before launch.",
+  "file": "tickets/067-rollback-plan.md"
+ },
+ {
+  "title": "Launch announcement and release notes",
+  "milestone": "Launch",
+  "labels": [
+   "release"
+  ],
+  "body": "Release notes from `CHANGELOG.md`, a Game Portal listing with screenshots/GIF, and a short message for players.",
+  "file": "tickets/068-launch-announcement-and-release-notes.md"
+ },
+ {
+  "title": "Post-launch hotfix window",
+  "milestone": "Launch",
+  "labels": [
+   "release",
+   "qa"
+  ],
+  "body": "Two weeks after launch: daily bug triage, fast patch releases (`v1.0.x`) for any blocker, then a retrospective issue listing what to do in v1.1 (online play, new pieces, alliances).",
+  "file": "tickets/069-post-launch-hotfix-window.md"
+ },
+ {
+  "title": "Build and maintain the README",
+  "milestone": "M1 Game logic core",
+  "labels": [
+   "docs",
+   "process"
+  ],
+  "body": "The README is the front door of the repo. Build it out now and keep it current for the life of the project.\n\n**Build**\n- [ ] What Chess War is, with a screenshot or GIF\n- [ ] How to play the prototype and the current build\n- [ ] Rules summary with a link to the full spec\n- [ ] Setup: `npm ci`, `npm run dev`, `npm test`, `npm run build`, `npm run sim`\n- [ ] Project layout\n- [ ] How to tune balance in `data.ts`\n- [ ] How to deploy to staging and the live Game Portal\n- [ ] Roadmap with links to each milestone, and the current stage (pre-Alpha / Alpha / Beta / Launched)\n- [ ] How to report a bug (link to the bug template)\n\n**Maintain**\n- [ ] Add a PR template checkbox: \"README updated if setup, rules, scripts or layout changed\"\n- [ ] Update the stage and roadmap when each Alpha / Beta / Launch gate checker closes\n- [ ] Refresh screenshots and GIFs when the Art milestone lands\n- [ ] Review the README at every release tag\n\nKeep this issue open until Launch; close it with the v1.0 README review.",
+  "file": "tickets/070-build-and-maintain-the-readme.md"
+ }
+]

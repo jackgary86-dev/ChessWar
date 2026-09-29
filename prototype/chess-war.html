@@ -1,0 +1,1016 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Chess War</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Stencil+One&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+Symbols+2&display=swap">
+<style>
+/* Layout: a war-room table. Battlefield canvas on top, shop + bench dock below, field manual + combat log at the side. Single dark look by choice. */
+:root{
+  color-scheme: dark;
+  --ground:#14120e; --panel:#1e1b15; --panel2:#27231b; --line:#3b3529;
+  --ink:#ede5d1; --muted:#a39985; --brass:#d3a64d; --brass-ink:#1a1408;
+  --crimson:#d65a43; --portal:#a47fff; --heal:#7cc977;
+  --sqL1:#dccca5; --sqD1:#9c805a; --sqL2:#c0c6b3; --sqD2:#76826c;
+  --ivory:#f1e9d4; --ebony:#1c1914;
+  --t1:#9b968a; --t2:#6fb56b; --t3:#5c9ce0; --t4:#e2aa3a;
+  --f-display:"Saira Stencil One", Impact, "Arial Narrow", sans-serif;
+  --f-body:"Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-mono:"JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  --f-piece:"Noto Sans Symbols 2", "Segoe UI Symbol", "Apple Symbols", "DejaVu Sans", serif;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{background:var(--ground);color:var(--ink)}
+body{font-family:var(--f-body);font-size:15px;line-height:1.45;padding-inline:16px;padding-block:14px 32px}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,[tabindex]:focus-visible{outline:2px solid var(--brass);outline-offset:2px}
+button:disabled{cursor:not-allowed;opacity:.45}
+.app{max-width:1280px;margin:0 auto;display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:18px}
+@media (max-width:960px){.app{grid-template-columns:minmax(0,1fr)}}
+.main{min-width:0;display:flex;flex-direction:column;gap:12px}
+.top{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1{font-family:var(--f-display);font-weight:400;font-size:clamp(28px,4vw,40px);letter-spacing:.04em;margin:0;line-height:1;color:var(--ink)}
+h1 span{color:var(--brass)}
+.roundinfo{font-family:var(--f-mono);font-size:12.5px;color:var(--muted);letter-spacing:.04em;text-transform:uppercase}
+.roundinfo b{color:var(--ink);font-weight:600}
+
+/* scoreboard */
+.scores{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:stretch}
+.vs{font-family:var(--f-display);color:var(--muted);align-self:center;font-size:18px}
+.pcard{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px 12px;display:grid;gap:6px;min-width:0}
+.pcard.active{border-color:var(--brass)}
+.pcard .nm{display:flex;align-items:center;gap:8px;font-weight:700;min-width:0}
+.pcard .nm .chip{width:14px;height:14px;border-radius:50%;flex:none;border:2px solid var(--muted)}
+.pcard .nm .chip.s0{background:var(--ivory)}
+.pcard .nm .chip.s1{background:var(--ebony)}
+.pcard .nm .txt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hpbar{height:8px;background:var(--panel2);border-radius:4px;overflow:hidden}
+.hpbar i{display:block;height:100%;background:var(--heal);transition:width .4s}
+.hpbar i.low{background:var(--crimson)}
+.stats{display:flex;flex-wrap:wrap;gap:4px 12px;font-family:var(--f-mono);font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.stats b{color:var(--ink);font-weight:600}
+.stats .gold b{color:var(--brass)}
+@media (max-width:560px){.scores{grid-template-columns:1fr 1fr}.vs{display:none}}
+
+/* battlefield */
+.field{position:relative;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:10px}
+.field canvas{display:block;margin:0 auto;touch-action:manipulation;max-width:100%}
+.combatbar{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:8px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:5px;overflow:hidden}
+.seg button{background:transparent;border:0;padding:6px 12px;font-family:var(--f-mono);font-size:12.5px}
+.seg button.on{background:var(--brass);color:var(--brass-ink)}
+.overlay{position:absolute;inset:0;display:grid;place-items:center;background:rgba(20,18,14,.72);border-radius:6px;padding:16px}
+.overlay .box{background:var(--panel);border:1px solid var(--brass);border-radius:6px;padding:18px 20px;max-width:420px;text-align:center;display:grid;gap:10px}
+.overlay h2{font-family:var(--f-display);font-weight:400;font-size:28px;margin:0;letter-spacing:.03em;text-wrap:balance}
+.overlay p{margin:0;color:var(--muted)}
+
+/* dock */
+.dock{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px;display:grid;gap:12px}
+.dockhead{display:flex;justify-content:space-between;align-items:baseline;gap:10px;flex-wrap:wrap}
+.label{font-family:var(--f-mono);font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.label b{color:var(--ink)}
+.shop{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
+.card{position:relative;background:var(--panel2);border:1px solid var(--line);border-top:4px solid var(--t1);border-radius:5px;padding:8px 6px 7px;display:grid;justify-items:center;gap:2px;min-width:0;text-align:center}
+.card:hover:not(:disabled){border-color:var(--brass);border-top-color:inherit}
+.card.t1{border-top-color:var(--t1)}.card.t2{border-top-color:var(--t2)}.card.t3{border-top-color:var(--t3)}.card.t4{border-top-color:var(--t4)}
+.card .g{font-family:var(--f-piece);font-size:36px;line-height:1.1;color:var(--ivory)}
+.card .n{font-weight:600;font-size:13px}
+.card .c{font-family:var(--f-mono);font-size:12px;color:var(--brass)}
+.card .pips{position:absolute;top:4px;right:5px;display:flex;gap:2px}
+.card .pips i{width:6px;height:6px;border-radius:50%;background:var(--brass)}
+.card.empty{border-top-color:var(--line);color:var(--muted);font-size:12px;place-content:center;min-height:92px}
+.actions{display:flex;flex-wrap:wrap;gap:8px}
+.btn{background:var(--panel2);border:1px solid var(--line);border-radius:5px;padding:8px 12px;font-weight:600;font-size:14px;display:inline-flex;gap:6px;align-items:center}
+.btn:hover:not(:disabled){border-color:var(--brass)}
+.btn small{font-family:var(--f-mono);font-weight:400;color:var(--brass);font-size:12px}
+.btn.on{border-color:var(--brass);color:var(--brass)}
+.btn.primary{background:var(--brass);color:var(--brass-ink);border-color:var(--brass);margin-left:auto}
+.btn.primary small{color:var(--brass-ink)}
+.btn.danger small{color:var(--crimson)}
+.bench{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:6px}
+.slot{height:clamp(44px,10vw,64px);max-width:100%;background:var(--panel2);border:1px dashed var(--line);border-radius:5px;display:grid;place-items:center;position:relative;padding:0}
+.slot .g{font-family:var(--f-piece);font-size:clamp(22px,4vw,34px);line-height:1}
+.slot .st{position:absolute;bottom:2px;left:0;right:0;font-size:10px;color:var(--brass);letter-spacing:1px}
+.slot.full{border-style:solid}
+.slot.sel{border:2px solid var(--brass);background:#3a3120}
+.hint{font-size:13px;color:var(--muted);margin:0}
+
+/* side */
+.side{display:flex;flex-direction:column;gap:12px;min-width:0}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:12px}
+.guide{display:grid;gap:10px;margin-top:8px}
+.gp{display:grid;grid-template-columns:34px 1fr;gap:2px 8px;align-items:start}
+.gp .g{font-family:var(--f-piece);font-size:28px;line-height:1;grid-row:span 3;color:var(--ivory)}
+.gp .h{font-weight:700;display:flex;gap:8px;align-items:baseline}
+.gp .h small{font-family:var(--f-mono);font-weight:400;color:var(--brass);font-size:11.5px}
+.gp .m{font-size:12.5px;color:var(--muted)}
+.gp .a{font-size:12.5px}
+.rules{margin:8px 0 0;padding-left:18px;font-size:13px;color:var(--muted);display:grid;gap:4px}
+.rules b{color:var(--ink)}
+.log{font-family:var(--f-mono);font-size:12px;max-height:260px;overflow:auto;margin-top:8px;display:grid;gap:2px;font-variant-numeric:tabular-nums}
+.log div{color:var(--muted)}
+.log .s0{color:var(--ivory)}
+.log .s1{color:#c9b7a2}
+.log .big{color:var(--brass);font-weight:600;margin-top:4px}
+
+/* full-screen covers */
+.cover{position:fixed;inset:0;z-index:20;background:var(--ground);display:grid;place-items:center;padding:24px 16px;overflow:auto}
+.cover .inner{max-width:560px;display:grid;gap:16px;text-align:center}
+.cover .big{font-family:var(--f-display);font-size:clamp(48px,11vw,96px);line-height:.9;letter-spacing:.04em}
+.cover .big span{color:var(--brass)}
+.cover .glyphs{font-family:var(--f-piece);font-size:40px;letter-spacing:6px;color:var(--ivory)}
+.cover .glyphs span{color:var(--muted)}
+.cover p{color:var(--muted);margin:0;text-wrap:balance}
+.cover .row{display:flex;gap:10px;justify-content:center;flex-wrap:wrap}
+.cover .btn{font-size:16px;padding:12px 18px}
+.cover ul{text-align:left;color:var(--muted);font-size:14px;display:grid;gap:6px;margin:0;padding-left:20px}
+.cover ul b{color:var(--ink)}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--panel2);border:1px solid var(--brass);border-radius:5px;padding:8px 14px;font-size:14px;z-index:30;max-width:calc(100% - 32px)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+
+<div class="app">
+  <div class="main">
+    <div class="top">
+      <h1>CHESS <span>WAR</span></h1>
+      <div class="roundinfo" id="roundinfo"></div>
+    </div>
+    <div class="scores" id="scores"></div>
+    <div class="field" id="field">
+      <canvas id="board" aria-label="Battlefield: two chess boards joined by portals"></canvas>
+      <div class="combatbar" id="combatbar" hidden>
+        <div class="seg" id="speedseg">
+          <button data-sp="1" class="on">1×</button><button data-sp="2">2×</button><button data-sp="4">4×</button>
+        </div>
+        <button class="btn" id="skipBtn">Skip to result</button>
+      </div>
+      <div class="overlay" id="resultOverlay" hidden>
+        <div class="box">
+          <h2 id="resTitle"></h2>
+          <p id="resText"></p>
+          <button class="btn primary" id="nextBtn" style="margin:0 auto">Next round</button>
+        </div>
+      </div>
+    </div>
+    <div class="dock" id="dock">
+      <div class="dockhead">
+        <div class="label" id="shopLabel">Shop</div>
+        <div class="label" id="oddsLabel"></div>
+      </div>
+      <div class="shop" id="shop"></div>
+      <div class="actions">
+        <button class="btn" id="rerollBtn">Reroll <small>2g</small></button>
+        <button class="btn" id="lockBtn">Lock shop</button>
+        <button class="btn" id="xpBtn">Buy XP <small>4g</small></button>
+        <button class="btn danger" id="sellBtn" disabled>Sell</button>
+        <button class="btn primary" id="readyBtn">Fight</button>
+      </div>
+      <div class="dockhead"><div class="label">Bench</div><div class="label" id="capLabel"></div></div>
+      <div class="bench" id="bench"></div>
+      <p class="hint" id="hint">Tap a piece, then tap a square on your board or a bench slot to move it.</p>
+    </div>
+  </div>
+  <aside class="side">
+    <div class="panel">
+      <div class="label">Field manual</div>
+      <ul class="rules">
+        <li><b>Portals.</b> The boards are walled off from each other. Pieces cross only through the glowing portal squares on ranks 6 and 3.</li>
+        <li><b>Knights</b> leap the wall anywhere.</li>
+        <li><b>Stars.</b> Three copies merge into ★★. Three ★★ merge into ★★★.</li>
+        <li><b>Captures.</b> A piece that lands a killing blow takes the square.</li>
+      </ul>
+      <div class="guide" id="guide"></div>
+    </div>
+    <div class="panel">
+      <div class="label">Battle log</div>
+      <div class="log" id="log"></div>
+    </div>
+  </aside>
+</div>
+
+<div class="cover" id="startCover">
+  <div class="inner">
+    <div class="glyphs">♟︎♞︎♝︎♜︎♛︎ <span>×</span> ♛︎♜︎♝︎♞︎♟︎</div>
+    <div class="big">CHESS <span>WAR</span></div>
+    <p>Two boards, two armies. Buy pieces, stack copies into stars, place up to 8 on your board, and watch them fight it out.</p>
+    <ul>
+      <li><b>Shop phase.</b> Spend gold on pieces, rerolls and XP. Your level sets how many pieces you can field, up to 8.</li>
+      <li><b>Fight.</b> Both armies are revealed and battle automatically with real chess movement. Damage replaces instant captures.</li>
+      <li><b>War.</b> Losing a fight costs HP. First commander at 0 HP loses.</li>
+    </ul>
+    <div class="row">
+      <button class="btn primary" id="startAI" style="margin:0">Play vs AI</button>
+      <button class="btn" id="startHot">2 players, same screen</button>
+    </div>
+  </div>
+</div>
+
+<div class="cover" id="handCover" hidden>
+  <div class="inner">
+    <div class="glyphs" id="handGlyph">♛︎</div>
+    <div class="big" id="handTitle" style="font-size:clamp(36px,8vw,64px)"></div>
+    <p id="handText"></p>
+    <div class="row"><button class="btn primary" id="handBtn" style="margin:0"></button></div>
+  </div>
+</div>
+
+<div class="cover" id="overCover" hidden>
+  <div class="inner">
+    <div class="big" id="overTitle" style="font-size:clamp(36px,8vw,64px)"></div>
+    <p id="overText"></p>
+    <div class="row"><button class="btn primary" id="againBtn" style="margin:0">New war</button></div>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(() => {
+"use strict";
+/* ============ DATA ============ */
+const VS = "︎";
+const TYPES = {
+  P:{name:"Pawn",  glyph:"♟", cost:1, tier:1, hp:380, atk:45, spd:2,
+     move:"Steps forward or diagonally forward. Strikes the 3 squares ahead.",
+     ab:"Shield Wall: with a friendly piece beside it, takes 15% / 30% less damage."},
+  N:{name:"Knight",glyph:"♞", cost:2, tier:2, hp:520, atk:70, spd:2,
+     move:"L-shaped jumps. Leaps the wall between boards.",
+     ab:"Fork: also hits 1 / every other enemy on its knight squares."},
+  B:{name:"Bishop",glyph:"♝", cost:2, tier:2, hp:440, atk:58, spd:2,
+     move:"Slides diagonally. Strikes up to 3 squares away.",
+     ab:"Blessing: each strike heals the most wounded ally for 60% / 120% of its attack."},
+  R:{name:"Rook",  glyph:"♜", cost:3, tier:3, hp:780, atk:72, spd:3,
+     move:"Slides on ranks and files. Strikes up to 3 squares away. Slow.",
+     ab:"Fortress: takes 20% / 35% less damage."},
+  Q:{name:"Queen", glyph:"♛", cost:5, tier:4, hp:720, atk:95, spd:2,
+     move:"Slides in all 8 directions. Strikes up to 3 squares away.",
+     ab:"Pierce: strikes also hit the enemy behind the target for 50% / 100%."},
+};
+const ORDER = ["P","N","B","R","Q"];
+const POOL_SIZE = {P:30, N:18, B:18, R:14, Q:9};
+const ODDS = {1:[100,0,0,0],2:[70,30,0,0],3:[50,45,5,0],4:[40,45,15,0],5:[30,42,25,3],6:[22,38,32,8],7:[15,33,37,15],8:[10,28,40,22]};
+const XPNEED = {2:2,3:4,4:6,5:10,6:14,7:20};
+const STAR_HP = [0,1,1.9,3.5], STAR_ATK = [0,1,1.8,3.3];
+const START_HP = 50, MAX_LEVEL = 8, TICK_MS = 420, MAX_TICKS = 220, IDLE_LIMIT = 26;
+const FILES = "abcdefghijklmnop";
+const sq = (x,y) => FILES[x] + (8 - y);
+const SIDE_NAME = ["Ivory","Ebony"];
+
+/* ============ GEOMETRY ============ */
+const W = 16, H = 8;
+const idx = (x,y) => y*W + x;
+const inb = (x,y) => x>=0 && x<W && y>=0 && y<H;
+const half = x => x < 8 ? 0 : 1;
+const PORTAL_Y = [2,5];
+const isPortal = (x,y) => (x===7 || x===8) && (y===2 || y===5);
+const crossOK = (x1,y1,x2,y2) => half(x1)===half(x2) || isPortal(x1,y1) || isPortal(x2,y2);
+const KN = [[1,2],[2,1],[2,-1],[1,-2],[-1,-2],[-2,-1],[-2,1],[-1,2]];
+const ORTH = [[1,0],[-1,0],[0,1],[0,-1]];
+const DIAG = [[1,1],[1,-1],[-1,1],[-1,-1]];
+const ALL8 = ORTH.concat(DIAG);
+const DIRS = {R:ORTH, B:DIAG, Q:ALL8};
+const STRIKE_RANGE = 3;
+
+function shuffle(a){ for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]];} return a; }
+const rnd = n => Math.random()*n|0;
+
+/* ============ STATE ============ */
+let G = null, uid = 1, sel = null;
+function newPlayer(name, isAI){
+  return {name, isAI, hp:START_HP, gold:0, level:2, xp:0, bench:Array(8).fill(null), board:{}, shop:Array(5).fill(null),
+          locked:false, streak:0, lastWon:false, income:0};
+}
+const mkUnit = (type, stars=1) => ({id:uid++, type, stars});
+const boardCount = p => Object.keys(p.board).length;
+const unitValue = u => TYPES[u.type].cost * Math.pow(3, u.stars-1);
+function allUnits(p){
+  const out = [];
+  p.bench.forEach((u,i)=>{ if(u) out.push({u, loc:{k:"bench",i}}); });
+  for(const key in p.board) out.push({u:p.board[key], loc:{k:"board",key}});
+  return out;
+}
+const countCopies = (p,t,s) => allUnits(p).filter(e=>e.u.type===t && e.u.stars===s).length;
+
+/* ============ POOL + SHOP ============ */
+function toPool(t,n=1){ G.pool[t] += n; }
+function drawFromTier(tier){
+  const types = ORDER.filter(t=>TYPES[t].tier===tier && G.pool[t]>0);
+  if(!types.length) return null;
+  let tot = types.reduce((s,t)=>s+G.pool[t],0), r = rnd(tot);
+  for(const t of types){ r -= G.pool[t]; if(r<0){ G.pool[t]--; return t; } }
+  return null;
+}
+function rollShop(p){
+  for(let i=0;i<5;i++){ if(p.shop[i]) toPool(p.shop[i]); p.shop[i]=null; }
+  const odds = ODDS[p.level];
+  for(let i=0;i<5;i++){
+    let r = rnd(100), tier = 1;
+    for(let k=0;k<4;k++){ if(r < odds[k]){ tier = k+1; break; } r -= odds[k]; }
+    let t = drawFromTier(tier);
+    for(let d=1; !t && d<4; d++) t = drawFromTier(tier-d) || drawFromTier(tier+d);
+    p.shop[i] = t;
+  }
+}
+function canTake(p,t){ return p.bench.includes(null) || countCopies(p,t,1) >= 2; }
+function buy(p,i){
+  const t = p.shop[i]; if(!t) return "none";
+  const c = TYPES[t].cost;
+  if(p.gold < c) return "gold";
+  if(!canTake(p,t)) return "bench";
+  p.gold -= c; p.shop[i] = null;
+  const u = mkUnit(t,1), bi = p.bench.indexOf(null);
+  if(bi >= 0){ p.bench[bi] = u; mergeAll(p, null); }
+  else mergeAll(p, u);
+  return "ok";
+}
+function mergeAll(p, overflow){
+  let merged = true, result = [];
+  while(merged){
+    merged = false;
+    const list = allUnits(p);
+    if(overflow) list.push({u:overflow, loc:{k:"over"}});
+    for(const t of ORDER) for(const s of [1,2]){
+      const same = list.filter(e=>e.u.type===t && e.u.stars===s);
+      if(same.length < 3) continue;
+      same.sort((a,b)=>(a.loc.k==="board"?0:a.loc.k==="bench"?1:2)-(b.loc.k==="board"?0:b.loc.k==="bench"?1:2));
+      const keep = same[0];
+      for(const e of same.slice(1,3)){
+        if(e.loc.k==="bench") p.bench[e.loc.i] = null;
+        else if(e.loc.k==="board") delete p.board[e.loc.key];
+        else overflow = null;
+      }
+      keep.u.stars++; result.push(keep.u);
+      merged = true; break;
+    }
+  }
+  if(result.length && !p.isAI) toast(`${TYPES[result[result.length-1].type].name} upgraded to ${"★".repeat(result[result.length-1].stars)}`);
+  return result;
+}
+function sellUnit(p,u){
+  const n = Math.pow(3,u.stars-1);
+  p.gold += TYPES[u.type].cost * n;
+  toPool(u.type, n);
+}
+function addXP(p,n){
+  p.xp += n;
+  while(p.level < MAX_LEVEL && p.xp >= XPNEED[p.level]){ p.xp -= XPNEED[p.level]; p.level++; }
+  if(p.level >= MAX_LEVEL) p.xp = 0;
+}
+
+/* ============ GAME FLOW ============ */
+function newGame(mode){
+  uid = 1; sel = null;
+  G = { mode, round:0, pool:{...POOL_SIZE}, phase:"prep", active:0, battle:null, speed:1,
+        players:[ newPlayer(mode==="ai"?"You":"Player 1", false), newPlayer(mode==="ai"?"Iron Bot":"Player 2", mode==="ai") ],
+        log:[] };
+  $("startCover").hidden = true; $("overCover").hidden = true;
+  startRound();
+}
+function streakBonus(s){ const a = Math.abs(s); return a>=6?3:a>=4?2:a>=2?1:0; }
+function startRound(){
+  G.round++; sel = null;
+  for(const p of G.players){
+    if(G.round === 1){ p.gold = 3; p.income = 3; }
+    else {
+      const base = Math.min(5, G.round+2), interest = Math.min(5, Math.floor(p.gold/10));
+      const inc = base + interest + streakBonus(p.streak) + (p.lastWon?1:0);
+      p.gold += inc; p.income = inc;
+      addXP(p,1);
+    }
+    if(!p.locked) rollShop(p);
+    p.locked = false;
+  }
+  G.phase = "prep"; G.active = 0; G.battle = null;
+  if(G.players[1].isAI) aiPrep(G.players[1]);
+  logLine(`Round ${G.round}`, "big");
+  $("resultOverlay").hidden = true;
+  if(G.mode === "hot") showHandoff(0); else renderAll();
+}
+function ready(){
+  if(G.phase !== "prep") return;
+  sel = null;
+  if(G.mode === "hot" && G.active === 0){ G.active = 1; showHandoff(1); return; }
+  beginBattle();
+}
+function showHandoff(who){
+  const p = G.players[who];
+  $("handGlyph").textContent = who===0 ? "♛"+VS : "♛"+VS;
+  $("handGlyph").style.color = who===0 ? "var(--ivory)" : "var(--muted)";
+  $("handTitle").textContent = `${p.name} · ${SIDE_NAME[who]}`;
+  $("handText").textContent = `Round ${G.round}. ${G.players[1-who].name}, look away while ${p.name} shops and places pieces.`;
+  $("handBtn").textContent = `I'm ${p.name}, start`;
+  $("handCover").hidden = false;
+  renderAll();
+}
+
+/* ============ AI ============ */
+function aiPrep(p){
+  let rerolls = 0;
+  for(let guard=0; guard<50; guard++){
+    let did = false;
+    for(let i=0;i<5 && !did;i++){
+      const t = p.shop[i];
+      if(t && p.gold >= TYPES[t].cost && (countCopies(p,t,1)>=1 || countCopies(p,t,2)>=1) && canTake(p,t)){ buy(p,i); did = true; }
+    }
+    if(did) continue;
+    const want = Math.min(MAX_LEVEL, 2 + Math.floor((G.round+1)/2));
+    if(p.level < want && p.gold >= 4){ p.gold -= 4; addXP(p,4); continue; }
+    const owned = allUnits(p).length;
+    if(owned < p.level + 1){
+      const reserve = G.round >= 6 && owned >= p.level ? 10 : 0;
+      let best = -1;
+      for(let i=0;i<5;i++){ const t=p.shop[i]; if(t && p.gold - TYPES[t].cost >= reserve && canTake(p,t) && (best<0 || TYPES[t].cost > TYPES[p.shop[best]].cost)) best = i; }
+      if(best >= 0){ buy(p,best); continue; }
+    }
+    if(p.gold >= 16 && G.round >= 5 && rerolls < 2){ p.gold -= 2; rollShop(p); rerolls++; continue; }
+    break;
+  }
+  aiPlace(p);
+}
+const FORM = { P:[[1,2],[1,5],[2,1],[2,6],[1,3],[1,4],[2,2],[2,5],[3,0],[3,7]], N:[[2,3],[2,4],[3,2],[3,5],[2,0],[2,7]],
+               R:[[3,3],[3,4],[4,2],[4,5]], Q:[[4,3],[4,4],[5,2],[5,5]], B:[[5,2],[5,5],[5,3],[5,4],[6,1],[6,6]] };
+function aiPlace(p){
+  const side = G.players.indexOf(p);
+  const units = allUnits(p).map(e=>e.u).sort((a,b)=>unitValue(b)-unitValue(a) || TYPES[b.type].hp - TYPES[a.type].hp);
+  p.board = {}; p.bench = Array(8).fill(null);
+  const toBoard = units.slice(0, p.level), rest = units.slice(p.level);
+  const wx = d => side===1 ? 8+d : 7-d;
+  for(const u of toBoard){
+    let placed = false;
+    for(const [d,y] of FORM[u.type]){ const k = wx(d)+","+y; if(!p.board[k]){ p.board[k]=u; placed=true; break; } }
+    for(let d=0; !placed && d<8; d++) for(let y=0; !placed && y<8; y++){ const k=wx(d)+","+y; if(!p.board[k]){ p.board[k]=u; placed=true; } }
+  }
+  rest.sort((a,b)=>unitValue(b)-unitValue(a));
+  rest.forEach((u,i)=>{ if(i<8) p.bench[i]=u; else sellUnit(p,u); });
+}
+
+/* ============ BATTLE SIM ============ */
+function makeBattle(){
+  const units = []; let id = 0;
+  G.players.forEach((p,side)=>{
+    for(const key in p.board){
+      const [x,y] = key.split(",").map(Number), u = p.board[key], T = TYPES[u.type];
+      const hp = Math.round(T.hp*STAR_HP[u.stars]);
+      units.push({id:id++, side, type:u.type, stars:u.stars, x, y, rx:x, ry:y, hp, maxHp:hp,
+                  atk:Math.round(T.atk*STAR_ATK[u.stars]), spd:T.spd, cd:1+rnd(T.spd), alive:true, fade:1, hitT:0});
+    }
+  });
+  return {units, tick:0, idle:0, over:false, winner:null, fx:[], byPoints:false};
+}
+function buildGrid(b){ const g = new Array(W*H).fill(null); for(const u of b.units) if(u.alive) g[idx(u.x,u.y)] = u; return g; }
+function strikes(u,x,y,g){
+  const out = [];
+  if(u.type === "P"){
+    const d = u.side===0 ? 1 : -1;
+    for(const dy of [-1,0,1]){ const nx=x+d, ny=y+dy; if(inb(nx,ny) && crossOK(x,y,nx,ny)){ const o=g[idx(nx,ny)]; if(o && o.side!==u.side) out.push(o); } }
+  } else if(u.type === "N"){
+    for(const [dx,dy] of KN){ const nx=x+dx, ny=y+dy; if(inb(nx,ny)){ const o=g[idx(nx,ny)]; if(o && o.side!==u.side) out.push(o); } }
+  } else {
+    for(const [dx,dy] of DIRS[u.type]){
+      let cx=x, cy=y;
+      for(let k=1;k<=STRIKE_RANGE;k++){
+        const nx=cx+dx, ny=cy+dy;
+        if(!inb(nx,ny) || !crossOK(cx,cy,nx,ny)) break;
+        const o = g[idx(nx,ny)];
+        if(o){ if(o.side!==u.side) out.push(o); break; }
+        cx=nx; cy=ny;
+      }
+    }
+  }
+  return out;
+}
+function moves(u,x,y,g){
+  const out = [];
+  if(u.type === "P"){
+    const d = u.side===0 ? 1 : -1;
+    for(const dy of [0,-1,1]){ const nx=x+d, ny=y+dy; if(inb(nx,ny) && crossOK(x,y,nx,ny) && !g[idx(nx,ny)]) out.push(idx(nx,ny)); }
+  } else if(u.type === "N"){
+    for(const [dx,dy] of KN){ const nx=x+dx, ny=y+dy; if(inb(nx,ny) && !g[idx(nx,ny)]) out.push(idx(nx,ny)); }
+  } else {
+    for(const [dx,dy] of DIRS[u.type]){
+      let cx=x, cy=y;
+      for(;;){ const nx=cx+dx, ny=cy+dy; if(!inb(nx,ny) || !crossOK(cx,cy,nx,ny) || g[idx(nx,ny)]) break; out.push(idx(nx,ny)); cx=nx; cy=ny; }
+    }
+  }
+  return out;
+}
+function distField(b, side){
+  // king-step distance (respecting the wall) to the nearest enemy of `side`
+  const f = new Int16Array(W*H).fill(999), q = [];
+  for(const u of b.units) if(u.alive && u.side!==side){ const i=idx(u.x,u.y); f[i]=0; q.push(i); }
+  for(let qi=0; qi<q.length; qi++){
+    const c=q[qi], cx=c%W, cy=(c/W)|0;
+    for(const [dx,dy] of ALL8){ const nx=cx+dx, ny=cy+dy; if(!inb(nx,ny) || !crossOK(cx,cy,nx,ny)) continue; const n=idx(nx,ny); if(f[n]>f[c]+1){ f[n]=f[c]+1; q.push(n); } }
+  }
+  return f;
+}
+function chooseMove(u,g,field){
+  const start = idx(u.x,u.y); g[start] = null;
+  const prev = new Int16Array(W*H).fill(-2); prev[start] = -1;
+  const q = [start]; let goal = -1;
+  for(let qi=0; qi<q.length && goal<0 && qi<200; qi++){
+    const c=q[qi];
+    for(const m of shuffle(moves(u, c%W, (c/W)|0, g))){
+      if(prev[m] !== -2) continue;
+      prev[m] = c;
+      if(strikes(u, m%W, (m/W)|0, g).length){ goal = m; break; }
+      q.push(m);
+    }
+  }
+  let res = -1;
+  if(goal >= 0){ let c = goal; while(prev[c] !== start) c = prev[c]; res = c; }
+  else {
+    let bv = field[start];
+    for(const m of shuffle(moves(u,u.x,u.y,g))) if(field[m] < bv){ bv = field[m]; res = m; }
+  }
+  g[start] = u;
+  return res;
+}
+function armor(t,g){
+  if(t.type==="R") return t.stars===3?0.35:t.stars===2?0.2:0;
+  if(t.type==="P" && t.stars>=2){
+    for(const [dx,dy] of ORTH){ const nx=t.x+dx, ny=t.y+dy; if(inb(nx,ny)){ const o=g[idx(nx,ny)]; if(o && o.side===t.side) return t.stars===3?0.3:0.15; } }
+  }
+  return 0;
+}
+function hit(b,u,t,mult,g){
+  const dmg = Math.max(1, Math.round(u.atk*mult*(1-armor(t,g))));
+  t.hp -= dmg; t.hitT = performance.now();
+  b.fx.push({k:"line", x1:u.x, y1:u.y, x2:t.x, y2:t.y, side:u.side, t:performance.now()});
+  b.fx.push({k:"num", x:t.x, y:t.y, txt:"-"+dmg, heal:false, t:performance.now()});
+  b.dealt = true;
+  if(t.hp <= 0){
+    t.hp = 0; t.alive = false; g[idx(t.x,t.y)] = null;
+    b.fx.push({k:"ring", x:t.x, y:t.y, t:performance.now()});
+    logLine(`${TYPES[u.type].glyph}${VS} ${sq(u.x,u.y)}×${sq(t.x,t.y)} ${TYPES[t.type].name} falls`, "s"+u.side);
+    return true;
+  }
+  return false;
+}
+function act(b,u,g,fields){
+  const targets = strikes(u,u.x,u.y,g);
+  if(targets.length){
+    targets.sort((a,c)=>a.hp-c.hp);
+    const t = targets[0];
+    const extra = [];
+    if(u.type==="N" && u.stars>=2){ const others = shuffle(targets.slice(1)); extra.push(...(u.stars===2?others.slice(0,1):others).map(o=>[o,1])); }
+    if(u.type==="Q" && u.stars>=2){
+      const dx=Math.sign(t.x-u.x), dy=Math.sign(t.y-u.y), nx=t.x+dx, ny=t.y+dy;
+      if(inb(nx,ny) && crossOK(t.x,t.y,nx,ny)){ const o=g[idx(nx,ny)]; if(o && o.side!==u.side) extra.push([o, u.stars===3?1:0.5]); }
+    }
+    const tx=t.x, ty=t.y;
+    const killed = hit(b,u,t,1,g);
+    for(const [o,m] of extra) if(o.alive) hit(b,u,o,m,g);
+    if(u.type==="B" && u.stars>=2){
+      let w = null;
+      for(const a of b.units) if(a.alive && a.side===u.side && a.hp<a.maxHp && (!w || a.maxHp-a.hp > w.maxHp-w.hp)) w = a;
+      if(w){ const h = Math.round(u.atk*(u.stars===3?1.2:0.6)); w.hp = Math.min(w.maxHp, w.hp+h); b.fx.push({k:"num",x:w.x,y:w.y,txt:"+"+h,heal:true,t:performance.now()}); }
+    }
+    if(killed && !g[idx(tx,ty)]){ g[idx(u.x,u.y)] = null; u.x=tx; u.y=ty; g[idx(tx,ty)] = u; }
+    u.cd = u.spd; return;
+  }
+  const m = chooseMove(u,g,fields[u.side]);
+  if(m >= 0){
+    const ox=u.x;
+    g[idx(u.x,u.y)] = null; u.x = m%W; u.y = (m/W)|0; g[m] = u;
+    if(half(ox)!==half(u.x) && u.type!=="N") logLine(`${TYPES[u.type].glyph}${VS} ${SIDE_NAME[u.side]} ${TYPES[u.type].name} crosses the portal at ${sq(u.x,u.y)}`, "s"+u.side);
+    u.cd = u.spd;
+  } else u.cd = 1;
+}
+function step(b){
+  if(b.over) return;
+  b.tick++; b.dealt = false;
+  const g = buildGrid(b);
+  const fields = [distField(b,0), distField(b,1)];
+  for(const u of shuffle(b.units.filter(u=>u.alive))){
+    if(!u.alive) continue;
+    if(--u.cd > 0) continue;
+    act(b,u,g,fields);
+  }
+  b.idle = b.dealt ? 0 : b.idle+1;
+  const alive = [0,1].map(s=>b.units.filter(u=>u.alive && u.side===s).length);
+  if(alive[0]===0 || alive[1]===0){
+    b.over = true; b.winner = alive[0]===alive[1] ? -1 : alive[0]>0 ? 0 : 1;
+  } else if(b.tick >= MAX_TICKS || b.idle >= IDLE_LIMIT){
+    const val = s => b.units.filter(u=>u.alive && u.side===s).reduce((a,u)=>a+unitValue(u)*u.hp/u.maxHp,0);
+    const v0 = val(0), v1 = val(1);
+    b.over = true; b.byPoints = true;
+    b.winner = Math.abs(v0-v1) < 0.5 ? -1 : v0 > v1 ? 0 : 1;
+  }
+}
+
+/* ============ ROUND RESULT ============ */
+function beginBattle(){
+  G.battle = makeBattle();
+  G.phase = "combat";
+  logLine(`${G.players[0].name} (${boardCount(G.players[0])}) vs ${G.players[1].name} (${boardCount(G.players[1])})`, "big");
+  if(!G.battle.units.length){ G.battle.over = true; G.battle.winner = -1; }
+  else if(!G.battle.units.some(u=>u.side===0) || !G.battle.units.some(u=>u.side===1)) step(G.battle);
+  renderAll();
+  if(G.battle.over) finishBattle();
+}
+function finishBattle(){
+  const b = G.battle; G.phase = "result";
+  const w = b.winner;
+  let title, text;
+  if(w === -1){
+    for(const p of G.players){ p.hp -= 2; p.lastWon = false; p.streak = 0; }
+    title = "Stalemate"; text = "Neither army could finish the job. Both commanders lose 2 HP.";
+  } else {
+    const W_ = G.players[w], L = G.players[1-w];
+    const stars = b.units.filter(u=>u.alive && u.side===w).reduce((a,u)=>a+u.stars,0);
+    const dmg = 2 + stars + Math.floor(G.round/4);
+    L.hp -= dmg;
+    W_.lastWon = true; L.lastWon = false;
+    W_.streak = W_.streak>0 ? W_.streak+1 : 1; L.streak = L.streak<0 ? L.streak-1 : -1;
+    title = `${W_.name} ${W_.name==="You"?"win":"wins"} round ${G.round}`;
+    text = `${b.byPoints?"Decided on remaining material. ":""}${L.name} ${L.name==="You"?"lose":"loses"} ${dmg} HP: 2 base, ${stars} from surviving stars${G.round>=4?`, ${Math.floor(G.round/4)} for the round`:""}.`;
+  }
+  for(const p of G.players) p.hp = Math.max(0,p.hp);
+  logLine(`${title}. ${text}`, "big");
+  const dead = G.players.filter(p=>p.hp<=0);
+  $("resTitle").textContent = title; $("resText").textContent = text;
+  $("nextBtn").textContent = dead.length ? "See the result" : "Next round";
+  $("resultOverlay").hidden = false;
+  renderAll();
+}
+function afterResult(){
+  const dead = G.players.filter(p=>p.hp<=0);
+  if(dead.length){
+    const alive = G.players.filter(p=>p.hp>0);
+    $("overTitle").textContent = alive.length ? `${alive[0].name} ${alive[0].name==="You"?"win":"wins"} the war` : "Mutual destruction";
+    $("overText").textContent = `After ${G.round} rounds. Final HP: ${G.players.map(p=>p.name+" "+p.hp).join(" · ")}.`;
+    $("overCover").hidden = false;
+    return;
+  }
+  startRound();
+}
+
+/* ============ UI ============ */
+const $ = id => document.getElementById(id);
+let toastTimer = 0;
+function toast(msg){ const t=$("toast"); t.textContent=msg; t.hidden=false; clearTimeout(toastTimer); toastTimer=setTimeout(()=>t.hidden=true, 2200); }
+function logLine(txt, cls){ if(!G) return; G.log.push({txt,cls}); if(G.log.length>120) G.log.splice(0,G.log.length-120); renderLog(); }
+function renderLog(){
+  const el = $("log"); if(!G){ el.innerHTML=""; return; }
+  el.innerHTML = G.log.map(l=>`<div class="${l.cls||""}">${esc(l.txt)}</div>`).join("");
+  el.scrollTop = el.scrollHeight;
+}
+const esc = s => String(s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const activeP = () => G.players[G.active];
+const humanTurn = () => G && G.phase==="prep" && !activeP().isAI && $("handCover").hidden;
+
+function renderAll(){
+  if(!G) return;
+  renderInfo(); renderScores(); renderDock(); renderLog();
+  $("combatbar").hidden = G.phase !== "combat";
+}
+function renderInfo(){
+  const ph = G.phase==="prep" ? `Shop · <b>${esc(activeP().name)}</b>` : G.phase==="combat" ? "<b>Battle</b>" : "Result";
+  $("roundinfo").innerHTML = `Round <b>${G.round}</b> · ${ph}`;
+}
+function renderScores(){
+  $("scores").innerHTML = G.players.map((p,i)=>{
+    const need = p.level<MAX_LEVEL ? `${p.xp}/${XPNEED[p.level]}` : "max";
+    const hideGold = G.mode==="hot" && G.phase==="prep" && G.active!==i;
+    const st = p.streak>1 ? ` · <b>${p.streak}</b> win streak` : p.streak<-1 ? ` · <b>${-p.streak}</b> loss streak` : "";
+    return `<div class="pcard ${G.phase==="prep"&&G.active===i?"active":""}">
+      <div class="nm"><span class="chip s${i}"></span><span class="txt">${esc(p.name)} · ${SIDE_NAME[i]}</span></div>
+      <div class="hpbar" title="${p.hp} HP"><i class="${p.hp<=15?"low":""}" style="width:${p.hp/START_HP*100}%"></i></div>
+      <div class="stats"><span><b>${p.hp}</b> HP</span><span class="gold"><b>${hideGold?"?":p.gold}</b> gold</span><span>Lv <b>${p.level}</b> <span>${need} xp</span></span>${st}</div>
+    </div>` + (i===0?'<div class="vs">VS</div>':"");
+  }).join("");
+}
+function renderDock(){
+  const on = humanTurn();
+  const p = activeP();
+  $("dock").style.opacity = on ? 1 : .55;
+  $("shopLabel").innerHTML = on ? `Shop · <b>${p.gold}</b> gold` : "Shop";
+  $("oddsLabel").textContent = "Odds " + ODDS[p.level].map((o,i)=>`T${i+1} ${o}%`).join(" · ");
+  $("shop").innerHTML = p.shop.map((t,i)=>{
+    if(!t) return `<div class="card empty">Bought</div>`;
+    const T = TYPES[t], n = countCopies(p,t,1) % 3;
+    const pips = n ? `<span class="pips">${"<i></i>".repeat(n)}</span>` : "";
+    return `<button class="card t${T.tier}" data-shop="${i}" ${!on||p.gold<T.cost?"disabled":""} title="${esc(T.name+": "+T.move+" ★★/★★★ "+T.ab)}">
+      ${pips}<span class="g">${T.glyph}${VS}</span><span class="n">${T.name}</span><span class="c">${T.cost}g</span></button>`;
+  }).join("");
+  $("bench").innerHTML = p.bench.map((u,i)=>{
+    const s = sel && sel.k==="bench" && sel.i===i;
+    const lbl = u ? `${TYPES[u.type].name} ${u.stars} star` : "Empty bench slot";
+    return `<button class="slot ${u?"full":""} ${s?"sel":""}" data-bench="${i}" aria-label="${lbl}" ${on?"":"disabled"}>${u?`<span class="g" style="color:${G.active===0?"var(--ivory)":"#b8ab93"}">${TYPES[u.type].glyph}${VS}</span><span class="st">${"★".repeat(u.stars)}</span>`:""}</button>`;
+  }).join("");
+  $("capLabel").innerHTML = `On board <b>${boardCount(p)}/${p.level}</b>`;
+  $("rerollBtn").disabled = !on || p.gold < 2;
+  $("xpBtn").disabled = !on || p.gold < 4 || p.level >= MAX_LEVEL;
+  $("xpBtn").innerHTML = p.level>=MAX_LEVEL ? "Max level" : `Buy XP <small>4g</small>`;
+  $("lockBtn").disabled = !on;
+  $("lockBtn").classList.toggle("on", p.locked);
+  $("lockBtn").textContent = p.locked ? "Shop locked" : "Lock shop";
+  const su = selUnit();
+  $("sellBtn").disabled = !on || !su;
+  $("sellBtn").innerHTML = su ? `Sell ${TYPES[su.type].name} <small>+${unitValue(su)}g</small>` : "Sell";
+  $("readyBtn").disabled = !on;
+  $("readyBtn").textContent = G.mode==="hot" && G.active===0 ? "Ready, pass to Player 2" : "Fight";
+  const open = p.level - boardCount(p), benched = p.bench.filter(Boolean).length;
+  $("hint").textContent = !on ? (G.phase==="combat" ? "Battle in progress." : "Waiting.") :
+    open>0 && benched>0 ? `You have ${open} open board slot${open>1?"s":""}. Tap a bench piece, then tap a square on your board.` :
+    "Tap a piece, then tap a square on your board or a bench slot to move it. Tap two pieces to swap them.";
+}
+function selUnit(){
+  if(!sel || !G) return null;
+  const p = activeP();
+  return sel.k==="bench" ? p.bench[sel.i] : p.board[sel.key] || null;
+}
+
+/* input */
+$("shop").addEventListener("click", e=>{
+  const b = e.target.closest("[data-shop]"); if(!b || !humanTurn()) return;
+  const r = buy(activeP(), +b.dataset.shop);
+  if(r==="bench") toast("Bench is full. Sell or place a piece first.");
+  sel = null; renderAll();
+});
+$("bench").addEventListener("click", e=>{
+  const b = e.target.closest("[data-bench]"); if(!b || !humanTurn()) return;
+  const p = activeP(), i = +b.dataset.bench, here = p.bench[i];
+  if(sel){
+    if(sel.k==="bench"){ if(sel.i!==i){ [p.bench[sel.i], p.bench[i]] = [p.bench[i], p.bench[sel.i]]; } }
+    else { const a = p.board[sel.key]; if(here) p.board[sel.key] = here; else delete p.board[sel.key]; p.bench[i] = a; }
+    sel = null;
+  } else if(here) sel = {k:"bench", i};
+  renderAll();
+});
+function onCell(x,y){
+  if(!humanTurn()) return;
+  const p = activeP();
+  if(half(x) !== G.active){ if(sel) toast("Place pieces on your own board."); return; }
+  const key = x+","+y, here = p.board[key];
+  if(sel){
+    if(sel.k==="board"){
+      if(sel.key !== key){ const a = p.board[sel.key]; if(here) p.board[sel.key] = here; else delete p.board[sel.key]; p.board[key] = a; }
+    } else {
+      const a = p.bench[sel.i];
+      if(here){ p.board[key] = a; p.bench[sel.i] = here; }
+      else if(boardCount(p) >= p.level){ toast(`Board is full (${p.level}/${p.level}). Buy XP to field more pieces.`); sel=null; renderAll(); return; }
+      else { p.board[key] = a; p.bench[sel.i] = null; }
+    }
+    sel = null;
+  } else if(here) sel = {k:"board", key};
+  renderAll();
+}
+$("rerollBtn").onclick = ()=>{ const p=activeP(); if(!humanTurn()||p.gold<2) return; p.gold-=2; rollShop(p); p.locked=false; renderAll(); };
+$("lockBtn").onclick = ()=>{ if(!humanTurn()) return; activeP().locked = !activeP().locked; renderAll(); };
+$("xpBtn").onclick = ()=>{ const p=activeP(); if(!humanTurn()||p.gold<4||p.level>=MAX_LEVEL) return; const L=p.level; p.gold-=4; addXP(p,4); if(p.level>L) toast(`Level ${p.level}: you can field ${p.level} pieces.`); renderAll(); };
+$("sellBtn").onclick = ()=>{
+  const u = selUnit(); if(!u || !humanTurn()) return;
+  const p = activeP(); sellUnit(p,u);
+  if(sel.k==="bench") p.bench[sel.i] = null; else delete p.board[sel.key];
+  sel = null; renderAll();
+};
+$("readyBtn").onclick = ready;
+$("nextBtn").onclick = afterResult;
+$("startAI").onclick = ()=>newGame("ai");
+$("startHot").onclick = ()=>newGame("hot");
+$("againBtn").onclick = ()=>{ $("overCover").hidden = true; $("startCover").hidden = false; };
+$("handBtn").onclick = ()=>{ $("handCover").hidden = true; renderAll(); };
+$("speedseg").addEventListener("click", e=>{
+  const b = e.target.closest("[data-sp]"); if(!b || !G) return;
+  G.speed = +b.dataset.sp;
+  document.querySelectorAll("#speedseg button").forEach(x=>x.classList.toggle("on", x===b));
+});
+$("skipBtn").onclick = ()=>{
+  if(!G || G.phase!=="combat") return;
+  let guard = 0; while(!G.battle.over && guard++ < 2000) step(G.battle);
+  for(const u of G.battle.units){ u.rx=u.x; u.ry=u.y; }
+  G.battle.fx = [];
+  finishBattle();
+};
+
+/* guide */
+$("guide").innerHTML = ORDER.map(t=>{ const T=TYPES[t]; return `<div class="gp"><span class="g">${T.glyph}${VS}</span>
+  <div class="h">${T.name}<small>${T.cost}g · ${T.hp} HP · ${T.atk} ATK</small></div>
+  <div class="m">${T.move}</div><div class="a">★★/★★★ ${T.ab}</div></div>`; }).join("");
+
+/* ============ CANVAS ============ */
+const cv = $("board"), ctx = cv.getContext("2d");
+let L = {vert:false, s:40, gap:24, w:0, h:0};
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+let C = {};
+function readColors(){ ["--sqL1","--sqD1","--sqL2","--sqD2","--portal","--brass","--crimson","--ivory","--ebony","--ground","--panel","--heal","--muted","--ink"].forEach(k=>C[k.slice(2)]=css(k)); }
+function layout(){
+  const avail = $("field").clientWidth - 20;
+  L.vert = avail < 620;
+  if(L.vert){ L.s = Math.max(28, Math.min(58, Math.floor(avail/8))); L.gap = Math.round(L.s*0.7); L.w = L.s*8; L.h = L.s*16 + L.gap; }
+  else { L.s = Math.max(24, Math.min(64, Math.floor(avail/16.7))); L.gap = Math.round(L.s*0.7); L.w = L.s*16 + L.gap; L.h = L.s*8; }
+  const dpr = window.devicePixelRatio || 1;
+  cv.width = L.w*dpr; cv.height = L.h*dpr; cv.style.width = L.w+"px"; cv.style.height = L.h+"px";
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+}
+// world (x,y) -> top-left pixel of the square
+function cellXY(x,y){
+  if(L.vert){ const row = 15 - x; return [y*L.s, row*L.s + (x<8 ? L.gap : 0)]; }
+  return [x*L.s + (x>=8 ? L.gap : 0), y*L.s];
+}
+function centerXY(fx,fy){ // fractional positions for animation
+  const x0 = Math.floor(fx), fr = fx - x0;
+  const a = cellXY(Math.min(15,Math.max(0,x0)), 0), b = cellXY(Math.min(15,Math.max(0,x0+1)), 0);
+  if(L.vert){ const py = a[1] + (b[1]-a[1])*fr; return [fy*L.s + L.s/2, py + L.s/2]; }
+  const px = a[0] + (b[0]-a[0])*fr; return [px + L.s/2, fy*L.s + L.s/2];
+}
+function cellFromPoint(px,py){
+  if(L.vert){
+    const y = Math.floor(px/L.s); let x;
+    if(py < 8*L.s) x = 15 - Math.floor(py/L.s);
+    else if(py < 8*L.s + L.gap) return null;
+    else x = 15 - Math.floor((py-L.gap)/L.s);
+    return inb(x,y) ? [x,y] : null;
+  }
+  const y = Math.floor(py/L.s); let x;
+  if(px < 8*L.s) x = Math.floor(px/L.s);
+  else if(px < 8*L.s + L.gap) return null;
+  else x = Math.floor((px-L.gap)/L.s);
+  return inb(x,y) ? [x,y] : null;
+}
+cv.addEventListener("click", e=>{
+  const r = cv.getBoundingClientRect();
+  const c = cellFromPoint(e.clientX - r.left, e.clientY - r.top);
+  if(c) onCell(c[0], c[1]);
+});
+
+const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
+function drawBoard(now){
+  ctx.fillStyle = C.ground; ctx.fillRect(0,0,L.w,L.h);
+  const s = L.s;
+  for(let x=0;x<16;x++) for(let y=0;y<8;y++){
+    const [px,py] = cellXY(x,y), light = (x+y)%2===0, h = half(x);
+    ctx.fillStyle = h===0 ? (light?C.sqL1:C.sqD1) : (light?C.sqL2:C.sqD2);
+    ctx.fillRect(px,py,s,s);
+  }
+  // wall + portal bridges
+  const pulse = reduced ? 0.5 : 0.5 + 0.5*Math.sin(now/420);
+  if(L.vert){
+    const gy = 8*s;
+    ctx.fillStyle = "#0c0b08"; ctx.fillRect(0,gy,L.w,L.gap);
+    for(const y of PORTAL_Y){ ctx.fillStyle = hexA(C.portal, .35+.25*pulse); ctx.fillRect(y*s+3, gy, s-6, L.gap); }
+  } else {
+    const gx = 8*s;
+    ctx.fillStyle = "#0c0b08"; ctx.fillRect(gx,0,L.gap,L.h);
+    for(const y of PORTAL_Y){ ctx.fillStyle = hexA(C.portal, .35+.25*pulse); ctx.fillRect(gx, y*s+3, L.gap, s-6); }
+  }
+  for(const x of [7,8]) for(const y of PORTAL_Y){
+    const [px,py] = cellXY(x,y);
+    const g = ctx.createRadialGradient(px+s/2,py+s/2,s*0.05,px+s/2,py+s/2,s*0.62);
+    g.addColorStop(0, hexA(C.portal,.75)); g.addColorStop(1, hexA(C.portal,0));
+    ctx.fillStyle = g; ctx.fillRect(px,py,s,s);
+    ctx.strokeStyle = hexA(C.portal, .6+.4*pulse); ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.ellipse(px+s/2,py+s/2,s*0.36,s*0.36*(0.85+0.15*pulse),0,0,Math.PI*2); ctx.stroke();
+  }
+  // notation
+  ctx.font = `600 ${Math.max(8,s*0.2)}px ${css("--f-mono")}`;
+  ctx.textBaseline = "alphabetic"; ctx.textAlign = "right";
+  for(let x=0;x<16;x++){ const [px,py] = cellXY(x,7); ctx.fillStyle = (x+7)%2===0 ? C.sqD1 : C.sqL1; if(half(x)) ctx.fillStyle = (x+7)%2===0 ? C.sqD2 : C.sqL2; ctx.fillText(FILES[x], px+s-3, py+s-3); }
+  ctx.textAlign = "left"; ctx.textBaseline = "top";
+  for(let y=0;y<8;y++){ const [px,py] = cellXY(0,y); ctx.fillStyle = y%2===0 ? C.sqD1 : C.sqL1; ctx.fillText(String(8-y), px+3, py+3); }
+}
+function hexA(hex,a){ const h=hex.replace("#",""); const n=parseInt(h.length===3?h.split("").map(c=>c+c).join(""):h,16); return `rgba(${n>>16&255},${n>>8&255},${n&255},${a})`; }
+function drawPiece(type, side, stars, cx, cy, alpha, hpFrac, flash){
+  const s = L.s;
+  ctx.save(); ctx.globalAlpha = alpha;
+  ctx.fillStyle = "rgba(0,0,0,.28)";
+  ctx.beginPath(); ctx.ellipse(cx, cy+s*0.3, s*0.28, s*0.08, 0, 0, Math.PI*2); ctx.fill();
+  ctx.font = `${Math.round(s*0.74)}px ${css("--f-piece")}`;
+  ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  const g = TYPES[type].glyph + VS;
+  ctx.lineJoin = "round"; ctx.lineWidth = Math.max(2, s*0.08);
+  ctx.strokeStyle = side===0 ? "#2a2317" : "#e9dfc6";
+  ctx.strokeText(g, cx, cy+s*0.02);
+  ctx.fillStyle = flash ? "#ffffff" : side===0 ? C.ivory : C.ebony;
+  ctx.fillText(g, cx, cy+s*0.02);
+  if(stars>1){
+    ctx.font = `${Math.round(s*0.22)}px ${css("--f-piece")}`;
+    ctx.lineWidth = 3; ctx.strokeStyle = "#1a1408"; const st = "★".repeat(stars);
+    ctx.strokeText(st, cx, cy+s*0.38); ctx.fillStyle = C.brass; ctx.fillText(st, cx, cy+s*0.38);
+  }
+  if(hpFrac != null){
+    const bw = s*0.76, bh = Math.max(3, s*0.08), bx = cx-bw/2, by = cy - s*0.47;
+    ctx.fillStyle = "rgba(0,0,0,.6)"; ctx.fillRect(bx-1,by-1,bw+2,bh+2);
+    ctx.fillStyle = side===0 ? C.brass : C.crimson; ctx.fillRect(bx,by,bw*Math.max(0,hpFrac),bh);
+  }
+  ctx.restore();
+}
+function drawFog(side, text){
+  const s = L.s;
+  const [ax,ay] = cellXY(side===0?0:8, 0);
+  const [bx,by] = cellXY(side===0?7:15, 7);
+  const x0 = Math.min(ax,bx), y0 = Math.min(ay,by), w = Math.abs(bx-ax)+s, h = Math.abs(by-ay)+s;
+  ctx.save();
+  ctx.fillStyle = "rgba(20,18,14,.72)"; ctx.fillRect(x0,y0,w,h);
+  ctx.beginPath(); ctx.rect(x0,y0,w,h); ctx.clip();
+  ctx.strokeStyle = "rgba(237,229,209,.07)"; ctx.lineWidth = 6;
+  for(let k=-h;k<w;k+=18){ ctx.beginPath(); ctx.moveTo(x0+k,y0); ctx.lineTo(x0+k+h,y0+h); ctx.stroke(); }
+  ctx.fillStyle = C.ink; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+  ctx.font = `${Math.max(14,s*0.42)}px ${css("--f-display")}`;
+  ctx.fillText(text, x0+w/2, y0+h/2 - s*0.25);
+  ctx.font = `${Math.max(11,s*0.24)}px ${css("--f-body")}`; ctx.fillStyle = C.muted;
+  ctx.fillText("Revealed when the fight starts", x0+w/2, y0+h/2 + s*0.3);
+  ctx.restore();
+}
+function draw(now){
+  drawBoard(now);
+  if(!G) return;
+  const s = L.s;
+  if(G.phase === "prep"){
+    const covered = !$("handCover").hidden;
+    for(let side=0; side<2; side++){
+      if(side !== G.active || covered){ drawFog(side, `${G.players[side].name} · ${SIDE_NAME[side]}`); continue; }
+      const p = G.players[side];
+      // own-board outline
+      const [ax,ay] = cellXY(side===0?0:8,0), [bx,by] = cellXY(side===0?7:15,7);
+      ctx.strokeStyle = C.brass; ctx.lineWidth = 2;
+      ctx.strokeRect(Math.min(ax,bx)+1, Math.min(ay,by)+1, Math.abs(bx-ax)+s-2, Math.abs(by-ay)+s-2);
+      for(const key in p.board){
+        const [x,y] = key.split(",").map(Number), u = p.board[key];
+        const [cx,cy] = centerXY(x,y);
+        if(sel && sel.k==="board" && sel.key===key){
+          ctx.strokeStyle = C.brass; ctx.lineWidth = 3;
+          ctx.beginPath(); ctx.arc(cx,cy,s*0.44,0,Math.PI*2); ctx.stroke();
+        }
+        drawPiece(u.type, side, u.stars, cx, cy, 1, null, false);
+      }
+      if(sel && sel.k==="bench"){
+        ctx.fillStyle = hexA(C.brass,.14);
+        for(let x=(side?8:0); x<(side?16:8); x++) for(let y=0;y<8;y++){ if(!p.board[x+","+y]){ const [px,py]=cellXY(x,y); ctx.fillRect(px+2,py+2,s-4,s-4);} }
+      }
+    }
+    return;
+  }
+  const b = G.battle; if(!b) return;
+  for(const u of b.units){
+    if(!u.alive) u.fade = Math.max(0, u.fade - 0.04);
+    if(u.fade <= 0) continue;
+    const [cx,cy] = centerXY(u.rx,u.ry);
+    const lift = u.type==="N" ? Math.min(1, Math.hypot(u.x-u.rx, u.y-u.ry)) * s*0.35 : 0;
+    drawPiece(u.type, u.side, u.stars, cx, cy - lift, u.fade, u.hp/u.maxHp, now - u.hitT < 90);
+  }
+  b.fx = b.fx.filter(f=>now - f.t < 800);
+  for(const f of b.fx){
+    const age = (now - f.t)/800;
+    if(f.k==="line" && age < 0.35){
+      const [x1,y1] = centerXY(f.x1,f.y1), [x2,y2] = centerXY(f.x2,f.y2);
+      ctx.strokeStyle = hexA(f.side===0?C.brass:C.crimson, 1-age/0.35); ctx.lineWidth = Math.max(2,s*0.07); ctx.lineCap = "round";
+      ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+    } else if(f.k==="num"){
+      const [x,y] = centerXY(f.x,f.y);
+      ctx.font = `700 ${Math.max(11,s*0.3)}px ${css("--f-mono")}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.lineWidth = 3; ctx.strokeStyle = "rgba(0,0,0,.8)";
+      ctx.globalAlpha = 1-age; ctx.strokeText(f.txt, x, y - s*0.3 - age*s*0.6);
+      ctx.fillStyle = f.heal ? C.heal : "#ffe7c2"; ctx.fillText(f.txt, x, y - s*0.3 - age*s*0.6); ctx.globalAlpha = 1;
+    } else if(f.k==="ring"){
+      const [x,y] = centerXY(f.x,f.y);
+      ctx.strokeStyle = hexA(C.crimson, 1-age); ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.arc(x,y,s*(0.2+age*0.5),0,Math.PI*2); ctx.stroke();
+    }
+  }
+}
+
+let last = performance.now(), acc = 0;
+function frame(now){
+  const dt = Math.min(0.1, (now-last)/1000); last = now;
+  if(G && G.phase==="combat" && G.battle){
+    acc += dt*1000*G.speed;
+    while(acc >= TICK_MS && G.phase==="combat"){
+      acc -= TICK_MS; step(G.battle);
+      if(G.battle.over){ acc = 0; finishBattle(); }
+    }
+  } else acc = 0;
+  if(G && G.battle){
+    const k = Math.min(1, dt*10*Math.max(1,G.speed*0.8));
+    for(const u of G.battle.units){ u.rx += (u.x-u.rx)*k; u.ry += (u.y-u.ry)*k; }
+  }
+  draw(now);
+  requestAnimationFrame(frame);
+}
+
+/* ============ BOOT ============ */
+function boot(data){
+  readColors(); layout();
+  if(data && data.G){ G = data.G; uid = data.uid || 1000; $("startCover").hidden = true; renderAll(); }
+  requestAnimationFrame(frame);
+}
+window.claude?.hot?.snapshot?.(()=> (G && G.phase==="prep" && $("handCover").hidden) ? {G: JSON.parse(JSON.stringify(G)), uid} : {});
+new ResizeObserver(()=>layout()).observe($("field"));
+(document.fonts ? document.fonts.load(`40px "Noto Sans Symbols 2"`, "♞") : Promise.resolve()).catch(()=>{}).finally(()=>{
+  window.claude?.hot?.ready ? window.claude.hot.ready(boot) : boot(window.claude?.hot?.data ?? {});
+});
+})();
+</script>
+</body>
+</html>

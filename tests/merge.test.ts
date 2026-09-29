@@ -14,7 +14,7 @@ import {
   reroll,
   sell,
 } from '@sim/shop.ts';
-import type { Holdings, Pool, ShopState } from '@sim/shop.ts';
+import type { Holdings, Pool, ShopState, Wallet } from '@sim/shop.ts';
 import type { PieceType, StarLevel } from '@sim/types.ts';
 
 const SEED = 9;
@@ -31,7 +31,7 @@ function stock(pool: Pool, shop: ShopState, type: PieceType): void {
 
 function buyType(pool: Pool, shop: ShopState, holdings: Holdings, type: PieceType): string {
   stock(pool, shop, type);
-  return buy(shop, holdings, 0);
+  return buy(shop, holdings, wallets.get(holdings) ?? { gold: 0 }, 0);
 }
 
 function pieces(holdings: Holdings): { type: PieceType; stars: StarLevel }[] {
@@ -41,26 +41,32 @@ function pieces(holdings: Holdings): { type: PieceType; stars: StarLevel }[] {
   ];
 }
 
-function setup(): { pool: Pool; shop: ShopState; holdings: Holdings } {
-  return { pool: createPool(), shop: createShop(), holdings: createHoldings(RICH) };
+/** Each test's wallet, looked up by its holdings. */
+const wallets = new WeakMap<Holdings, Wallet>();
+
+function setup(): { pool: Pool; shop: ShopState; holdings: Holdings; wallet: Wallet } {
+  const holdings = createHoldings();
+  const wallet = { gold: RICH };
+  wallets.set(holdings, wallet);
+  return { pool: createPool(), shop: createShop(), holdings, wallet };
 }
 
 describe('buying', () => {
   it('pays the cost and puts the piece on the bench', () => {
-    const { pool, shop, holdings } = setup();
+    const { pool, shop, holdings, wallet } = setup();
     expect(buyType(pool, shop, holdings, 'N')).toBe('ok');
-    expect(holdings.gold).toBe(RICH - PIECES.N.cost);
+    expect(wallet.gold).toBe(RICH - PIECES.N.cost);
     expect(holdings.bench[0]).toMatchObject({ type: 'N', stars: 1 });
     expect(shop.slots[0]).toBeNull();
   });
 
   it('refuses when short of gold, on an empty slot, and changes nothing', () => {
-    const { pool, shop, holdings } = setup();
-    holdings.gold = PIECES.Q.cost - 1;
+    const { pool, shop, holdings, wallet } = setup();
+    wallet.gold = PIECES.Q.cost - 1;
     expect(buyType(pool, shop, holdings, 'Q')).toBe('gold');
     expect(shop.slots[0]).toBe('Q');
     expect(holdings.bench.every((p) => p === null)).toBe(true);
-    expect(buy(shop, holdings, 1)).toBe('empty-slot');
+    expect(buy(shop, holdings, wallet, 1)).toBe('empty-slot');
   });
 
   it('a full bench blocks a buy that does not complete a merge', () => {
@@ -137,42 +143,42 @@ describe('merging', () => {
 
 describe('selling', () => {
   it('refunds cost × 3^(stars−1) and returns that many copies to the pool', () => {
-    const { pool, shop, holdings } = setup();
+    const { pool, shop, holdings, wallet } = setup();
     for (let i = 0; i < 3; i++) buyType(pool, shop, holdings, 'N');
     const before = poolTotal(pool);
-    const gold = holdings.gold;
+    const gold = wallet.gold;
     const piece = pieces(holdings)[0];
     const id = holdings.bench.find((p) => p !== null)?.id ?? -1;
     expect(piece?.stars).toBe(2);
-    expect(sell(pool, holdings, id)).toBe(sellValue('N', 2));
-    expect(holdings.gold).toBe(gold + PIECES.N.cost * copiesForStars(2));
+    expect(sell(pool, holdings, wallet, id)).toBe(sellValue('N', 2));
+    expect(wallet.gold).toBe(gold + PIECES.N.cost * copiesForStars(2));
     expect(poolTotal(pool)).toBe(before + copiesForStars(2));
     expect(pieces(holdings)).toHaveLength(0);
   });
 
   it('returns null for a piece it does not own', () => {
-    const { pool, holdings } = setup();
-    expect(sell(pool, holdings, 12345)).toBeNull();
+    const { pool, holdings, wallet } = setup();
+    expect(sell(pool, holdings, wallet, 12345)).toBeNull();
   });
 });
 
 describe('piece conservation with buying and merging', () => {
   it('pool + shop + hands stay constant through buys, merges, sells and rerolls', () => {
     const rng = createRng(SEED);
-    const { pool, shop, holdings } = setup();
+    const { pool, shop, holdings, wallet } = setup();
     const total = (): number =>
       poolTotal(pool) +
       shop.slots.filter((c) => c !== null).length +
       pieces(holdings).reduce((sum, p) => sum + copiesForStars(p.stars), 0);
-    reroll(pool, shop, holdings, 2, rng);
+    reroll(pool, shop, wallet, 2, rng);
     expect(total()).toBe(TOTAL_COPIES);
     for (let step = 0; step < 400; step++) {
       if (step % 5 === 4) {
         const victim = holdings.bench.find((p) => p !== null);
-        if (victim) sell(pool, holdings, victim.id);
+        if (victim) sell(pool, holdings, wallet, victim.id);
       } else {
-        reroll(pool, shop, holdings, 2, rng);
-        for (let slot = 0; slot < PLAYER.shopSize; slot++) buy(shop, holdings, slot);
+        reroll(pool, shop, wallet, 2, rng);
+        for (let slot = 0; slot < PLAYER.shopSize; slot++) buy(shop, holdings, wallet, slot);
       }
       expect(total()).toBe(TOTAL_COPIES);
     }

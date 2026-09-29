@@ -167,8 +167,8 @@ export interface PlacedPiece extends OwnedPiece {
   y: number;
 }
 
-/** Everything a player owns that buying, selling and merging touch. */
-export interface Holdings extends Wallet {
+/** Everything a player owns; gold lives in the player's wallet (Economy). */
+export interface Holdings {
   /** Bench slots; null when empty. */
   bench: (OwnedPiece | null)[];
   board: PlacedPiece[];
@@ -178,9 +178,8 @@ export interface Holdings extends Wallet {
 
 export type BuyResult = 'ok' | 'empty-slot' | 'gold' | 'bench-full';
 
-export function createHoldings(gold = 0): Holdings {
+export function createHoldings(): Holdings {
   return {
-    gold,
     bench: Array.from({ length: PLAYER.benchSize }, () => null),
     board: [],
     nextId: 1,
@@ -237,13 +236,13 @@ export function canTake(holdings: Holdings, type: PieceType): boolean {
 }
 
 /** Buy the card in a shop slot: pays its cost, benches it and merges. */
-export function buy(shop: ShopState, holdings: Holdings, slot: number): BuyResult {
+export function buy(shop: ShopState, holdings: Holdings, wallet: Wallet, slot: number): BuyResult {
   const type = shop.slots[slot] ?? null;
   if (type === null) return 'empty-slot';
-  if (holdings.gold < PIECES[type].cost) return 'gold';
+  if (wallet.gold < PIECES[type].cost) return 'gold';
   if (!canTake(holdings, type)) return 'bench-full';
   takeCard(shop, slot);
-  holdings.gold -= PIECES[type].cost;
+  wallet.gold -= PIECES[type].cost;
   const piece: OwnedPiece = { id: holdings.nextId, type, stars: 1 };
   holdings.nextId += 1;
   const free = holdings.bench.indexOf(null);
@@ -261,13 +260,13 @@ export function buy(shop: ShopState, holdings: Holdings, slot: number): BuyResul
  * and returns that many copies to the pool. Returns the refund, or null if the
  * piece is not owned.
  */
-export function sell(pool: Pool, holdings: Holdings, id: number): number | null {
+export function sell(pool: Pool, holdings: Holdings, wallet: Wallet, id: number): number | null {
   const piece = ownedPieces(holdings).find((p) => p.id === id);
   if (piece === undefined) return null;
   holdings.board = holdings.board.filter((p) => p !== piece);
   holdings.bench = holdings.bench.map((p) => (p === piece ? null : p));
   const refund = sellValue(piece.type, piece.stars);
-  holdings.gold += refund;
+  wallet.gold += refund;
   returnToPool(pool, piece.type, copiesForStars(piece.stars));
   return refund;
 }

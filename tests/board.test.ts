@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { generateMoves, isPortal, parseSquare, squareName } from '@sim/board.ts';
+import { generateMoves, generateStrikes, isPortal, parseSquare, squareName } from '@sim/board.ts';
 import type { Occupied, Pos } from '@sim/board.ts';
 import type { PieceType, Side } from '@sim/types.ts';
 
@@ -135,5 +135,58 @@ describe('piece move shapes', () => {
     const rook = generateMoves('R', 0, parseSquare('b2'), EMPTY);
     const bishop = generateMoves('B', 0, parseSquare('b2'), EMPTY);
     expect(all).toHaveLength(rook.length + bishop.length);
+  });
+});
+
+describe('strike generation', () => {
+  function strikesFrom(
+    type: PieceType,
+    square: string,
+    opts: { side?: Side; blockers?: string[] } = {},
+  ): string[] {
+    const blocked = new Set(opts.blockers ?? []);
+    const occupied: Occupied = (p: Pos) => blocked.has(squareName(p));
+    return generateStrikes(type, opts.side ?? 0, parseSquare(square), occupied)
+      .map(squareName)
+      .sort();
+  }
+
+  it('pawns strike the 3 squares ahead for each side', () => {
+    expect(strikesFrom('P', 'c4', { side: 0 })).toEqual(['d3', 'd4', 'd5']);
+    expect(strikesFrom('P', 'n4', { side: 1 })).toEqual(['m3', 'm4', 'm5']);
+  });
+
+  it('pawn strikes respect the wall unless a portal is involved', () => {
+    expect(strikesFrom('P', 'h5', { side: 0 })).toEqual(['i6']);
+    expect(strikesFrom('P', 'h6', { side: 0 })).toEqual(['i5', 'i6', 'i7']);
+    expect(strikesFrom('P', 'i5', { side: 1 })).toEqual(['h6']);
+  });
+
+  it('knights strike knight squares, over the wall and over pieces', () => {
+    const squares = strikesFrom('N', 'g4', { blockers: ['h4', 'h5', 'g5'] });
+    expect(squares).toContain('i5');
+    expect(squares).toHaveLength(8);
+    expect(strikesFrom('N', 'a1')).toEqual(['b3', 'c2']);
+  });
+
+  it('slider range is capped at 3', () => {
+    expect(strikesFrom('R', 'a8')).toEqual(['a5', 'a6', 'a7', 'b8', 'c8', 'd8']);
+    expect(strikesFrom('B', 'a8')).toEqual(['b7', 'c6', 'd5']);
+    expect(strikesFrom('Q', 'a8')).toEqual(['a5', 'a6', 'a7', 'b7', 'b8', 'c6', 'c8', 'd5', 'd8']);
+  });
+
+  it('the first piece, friend or foe, blocks line of sight beyond it', () => {
+    expect(strikesFrom('R', 'a8', { blockers: ['c8', 'a6'] })).toEqual(['a6', 'a7', 'b8', 'c8']);
+    expect(strikesFrom('B', 'a8', { blockers: ['b7'] })).toEqual(['b7']);
+  });
+
+  it('the wall blocks non-portal strikes and portals let them through', () => {
+    expect(strikesFrom('R', 'h5')).not.toContain('i5');
+    expect(strikesFrom('R', 'h5')).toEqual(['e5', 'f5', 'g5', 'h2', 'h3', 'h4', 'h6', 'h7', 'h8']);
+    expect(strikesFrom('R', 'h6')).toEqual(expect.arrayContaining(['i6', 'j6', 'k6']));
+    expect(strikesFrom('R', 'h6')).not.toContain('l6');
+    expect(strikesFrom('B', 'g7')).toEqual(expect.arrayContaining(['h6', 'i5']));
+    expect(strikesFrom('B', 'g7')).toContain('j4');
+    expect(strikesFrom('B', 'g7')).not.toContain('k3');
   });
 });

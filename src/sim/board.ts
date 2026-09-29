@@ -9,7 +9,7 @@
  * strikes and live in strike generation. Occupied squares are never move
  * targets and always block slides.
  */
-import { BOARD } from './data.ts';
+import { BOARD, PIECES } from './data.ts';
 import type { PieceType, Side } from './types.ts';
 
 export interface Pos {
@@ -150,4 +150,57 @@ export function generateMoves(type: PieceType, side: Side, from: Pos, occupied: 
     case 'Q':
       return slideMoves(from, ALL_DIRS, occupied);
   }
+}
+
+/**
+ * Squares a piece can strike from `from`, in line of sight.
+ *
+ * Fixed patterns (pawn, knight) list every pattern square on the board.
+ * Sliding pieces walk each line up to their strike range; the first occupied
+ * square is included (it may hold a target) and ends the line, so any piece,
+ * friend or foe, blocks sight beyond it. The wall stops non-portal strikes
+ * for everything except knights. The caller filters for enemy occupants.
+ */
+export function generateStrikes(type: PieceType, side: Side, from: Pos, occupied: Occupied): Pos[] {
+  switch (type) {
+    case 'P': {
+      const dx = forwardX(side);
+      return [
+        { x: dx, y: 0 },
+        { x: dx, y: 1 },
+        { x: dx, y: -1 },
+      ]
+        .map((dir) => add(from, dir))
+        .filter((to) => inBounds(to) && stepAllowed(from, to));
+    }
+    case 'N':
+      return KNIGHT_JUMPS.map((jump) => add(from, jump)).filter(inBounds);
+    case 'B':
+      return sliderStrikes(from, DIAGONAL_DIRS, PIECES.B.strikeRange, occupied);
+    case 'R':
+      return sliderStrikes(from, ORTHOGONAL_DIRS, PIECES.R.strikeRange, occupied);
+    case 'Q':
+      return sliderStrikes(from, ALL_DIRS, PIECES.Q.strikeRange, occupied);
+  }
+}
+
+function sliderStrikes(
+  from: Pos,
+  dirs: readonly Pos[],
+  range: number | undefined,
+  occupied: Occupied,
+): Pos[] {
+  const maxSteps = range ?? 0;
+  const squares: Pos[] = [];
+  for (const dir of dirs) {
+    let here = from;
+    for (let step = 0; step < maxSteps; step++) {
+      const next = add(here, dir);
+      if (!inBounds(next) || !stepAllowed(here, next)) break;
+      squares.push(next);
+      if (occupied(next)) break;
+      here = next;
+    }
+  }
+  return squares;
 }

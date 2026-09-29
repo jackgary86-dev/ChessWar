@@ -9,6 +9,7 @@ import type { OverlayView } from './overlays-model.ts';
 
 export interface OverlayActions {
   start: (mode: GameMode) => void;
+  continueSaved: () => void;
   confirmHandoff: () => void;
   nextRound: () => void;
   newWar: () => void;
@@ -54,6 +55,7 @@ function boxFor(view: OverlayView, actions: OverlayActions): HTMLElement {
           actions.start('local');
         }),
       );
+      if (view.canContinue) box.append(button('Continue saved war', actions.continueSaved));
       break;
     case 'handoff':
       box.append(

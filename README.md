@@ -4,7 +4,7 @@ An auto-battler played with real chess pieces. Two players each own an 8×8 boar
 
 ## Play the prototype
 
-Open `prototype/chess-war.html` in a browser. It is a single file with no build step. You can play against the AI, or with two people taking turns on the same screen.
+Open `prototype/chess-war.html` in a browser. It is a single file with no build step. Its rules version is noted at the top of the file, and `tests/prototype-sync.test.ts` fails if its numbers drift from `src/sim/data.ts`. You can play against the AI, or with two people taking turns on the same screen.
 
 ## How a round works
 

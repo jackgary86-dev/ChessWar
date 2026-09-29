@@ -10,5 +10,6 @@
  *   economy.ts, shop.ts, ai.ts, game.ts
  */
 export * from './board.ts';
+export * from './pathfinding.ts';
 export * from './rng.ts';
 export const GAME_NAME = 'Chess War';

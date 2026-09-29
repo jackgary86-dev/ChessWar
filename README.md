@@ -29,9 +29,29 @@ Open `prototype/chess-war.html` in a browser. It is a single file with no build 
 
 The full rules, including numbers, economy and AI behavior, are in [`docs/CODER_PROMPT.md`](docs/CODER_PROMPT.md).
 
+## Development
+
+Requires Node 24 (see `.nvmrc`).
+
+```
+npm ci            install dependencies
+npm run dev       start the Vite dev server
+npm test          run the Vitest suite
+npm run lint      ESLint + Prettier check
+npm run build     type-check and build static files into dist/
+npm run sim       headless AI-vs-AI balance runner, e.g. npm run sim -- --games 500
+```
+
+CI runs lint, test, build and a 1-game sim on every push and pull request.
+
 ## Repository layout
 
 ```
+src/sim/                   Pure, deterministic game logic (no DOM, timers or Math.random)
+src/ui/                    Canvas renderer, input and DOM HUD
+src/main.ts                Browser entry point
+tests/                     Vitest unit tests
+scripts/sim.ts             Headless balance runner behind npm run sim
 prototype/chess-war.html   Playable single-file prototype (reference for rules and feel)
 docs/CODER_PROMPT.md       Spec and build brief for the full TypeScript project
 docs/tickets.json          Development tickets (one GitHub issue each)

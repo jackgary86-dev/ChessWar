@@ -9,9 +9,9 @@
  * pattern (moving onto the square on a kill), otherwise it steps along the
  * path from `pathfinding.ts`, otherwise it waits one tick.
  *
- * Star abilities (2★ / 3★) fire as part of the strike. The idle / material end
- * conditions (#10) build on this loop; here a battle ends when one side is
- * wiped out, or at the hard `BATTLE.maxTicks` cap.
+ * Star abilities (2★ / 3★) fire as part of the strike. A battle ends when one
+ * side is wiped out, after `BATTLE.idleTickLimit` ticks without damage, or at
+ * `BATTLE.maxTicks`; the last two are decided on remaining material.
  */
 import {
   ORTHOGONAL_DIRS,
@@ -22,7 +22,7 @@ import {
   stepAllowed,
 } from './board.ts';
 import type { Pos } from './board.ts';
-import { ABILITY, BATTLE, BOARD, PIECES, unitAtk, unitHp } from './data.ts';
+import { ABILITY, BATTLE, BOARD, PIECES, copiesForStars, unitAtk, unitHp } from './data.ts';
 import { findStep } from './pathfinding.ts';
 import { int, shuffle } from './rng.ts';
 import type { Rng } from './rng.ts';
@@ -90,14 +90,19 @@ export type BattleEvent =
       readonly pos: Pos;
     };
 
+/** Why a fight ended. */
+export type BattleEndReason = 'elimination' | 'idle' | 'timeout';
+
 export interface BattleState {
   tick: number;
   readonly units: BattleUnit[];
   readonly rng: Rng;
   readonly events: BattleEvent[];
-  /** Side with pieces left once the other is wiped out; null while undecided. */
+  /** Winning side once finished; null while undecided or on a draw. */
   winner: Side | null;
   finished: boolean;
+  /** Set when finished. A finished battle with a null winner is a draw. */
+  endReason: BattleEndReason | null;
   /** Tick of the most recent strike (0 if none yet). */
   lastDamageTick: number;
 }
@@ -150,6 +155,7 @@ export function createBattle(armies: readonly ArmyPiece[], rng: Rng): BattleStat
     events: [],
     winner: null,
     finished: false,
+    endReason: null,
     lastDamageTick: 0,
   };
   checkFinished(state);
@@ -160,16 +166,37 @@ function alive(state: BattleState): BattleUnit[] {
   return state.units.filter((u) => u.hp > 0);
 }
 
-function checkFinished(state: BattleState): void {
-  const living = alive(state);
-  const sides = new Set(living.map((u) => u.side));
-  if (sides.size < 2) {
-    state.finished = true;
-    const [only] = [...sides];
-    state.winner = only ?? null;
-  } else if (state.tick >= BATTLE.maxTicks) {
-    state.finished = true;
+/**
+ * Remaining material of a side: Σ cost × 3^(stars−1) × hp / maxHp over its
+ * living pieces (spec §3.3 tiebreak).
+ */
+export function material(units: readonly BattleUnit[], side: Side): number {
+  return units
+    .filter((u) => u.side === side && u.hp > 0)
+    .reduce((sum, u) => sum + PIECES[u.type].cost * copiesForStars(u.stars) * (u.hp / u.maxHp), 0);
+}
+
+function finish(state: BattleState, reason: BattleEndReason): void {
+  state.finished = true;
+  state.endReason = reason;
+  if (reason === 'elimination') {
+    const survivor = alive(state)[0];
+    state.winner = survivor?.side ?? null;
+    return;
   }
+  const [ivory, ebony] = [material(state.units, 0), material(state.units, 1)];
+  state.winner = ivory === ebony ? null : ivory > ebony ? 0 : 1;
+}
+
+/**
+ * End conditions: one side wiped out; otherwise no damage for `idleTickLimit`
+ * ticks or `maxTicks` reached, decided on remaining material (exact tie = draw).
+ */
+function checkFinished(state: BattleState): void {
+  const sides = new Set(alive(state).map((u) => u.side));
+  if (sides.size < 2) finish(state, 'elimination');
+  else if (state.tick - state.lastDamageTick >= BATTLE.idleTickLimit) finish(state, 'idle');
+  else if (state.tick >= BATTLE.maxTicks) finish(state, 'timeout');
 }
 
 /** Star level that unlocks an ability, or null at 1★ (abilities are off). */

@@ -231,11 +231,13 @@ export function createHud(root: HTMLElement, actions: HudActions): Hud {
         el('b', undefined, `${String(view.onBoard)}/${String(view.boardCap)}`),
       );
       dock.classList.toggle('off', !view.enabled);
+      // Bench first, shop below it: the pieces you own sit next to the board,
+      // and the shop reads as "what to add" underneath.
       dock.replaceChildren(
-        head,
-        shopRow(view, actions, play.boughtSlot),
         cap,
         benchRow(view, actions, play.benchSlots ?? []),
+        head,
+        shopRow(view, actions, play.boughtSlot),
         actionRow(view, actions),
       );
     },

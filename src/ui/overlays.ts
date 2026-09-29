@@ -9,6 +9,12 @@ import type { OverlayView } from './overlays-model.ts';
 
 export interface OverlayActions {
   start: (mode: GameMode) => void;
+  startOnline: () => void;
+  onlineCreate: (name: string) => void;
+  onlineJoin: (name: string, code: string) => void;
+  onlineReady: () => void;
+  /** Leave the online screens and go back to the start screen. */
+  onlineLeave: () => void;
   continueSaved: () => void;
   confirmHandoff: () => void;
   nextRound: () => void;
@@ -37,6 +43,37 @@ function button(label: string, onClick: () => void, primary = false): HTMLButton
   return b;
 }
 
+function onlineMenu(error: string | null, actions: OverlayActions): HTMLElement[] {
+  const name = el('input');
+  name.type = 'text';
+  name.maxLength = 20;
+  name.placeholder = 'Your name';
+  name.setAttribute('aria-label', 'Your name');
+  const code = el('input');
+  code.type = 'text';
+  code.maxLength = 8;
+  code.placeholder = 'Room code';
+  code.setAttribute('aria-label', 'Room code');
+  code.autocapitalize = 'characters';
+  const nodes: HTMLElement[] = [el('h2', undefined, 'Play online'), name];
+  if (error) nodes.push(el('p', 'muted', error));
+  nodes.push(
+    button(
+      'Create room',
+      () => {
+        actions.onlineCreate(name.value);
+      },
+      true,
+    ),
+    code,
+    button('Join room', () => {
+      actions.onlineJoin(name.value, code.value);
+    }),
+    button('Back', actions.onlineLeave),
+  );
+  return nodes;
+}
+
 function boxFor(view: OverlayView, actions: OverlayActions): HTMLElement {
   const box = el('div', 'box');
   switch (view.kind) {
@@ -54,8 +91,43 @@ function boxFor(view: OverlayView, actions: OverlayActions): HTMLElement {
         button('2 players on one screen', () => {
           actions.start('local');
         }),
+        button('Play online', actions.startOnline),
       );
       if (view.canContinue) box.append(button('Continue saved war', actions.continueSaved));
+      break;
+    case 'online-menu':
+      box.append(...onlineMenu(view.error, actions));
+      break;
+    case 'online-lobby': {
+      const readyButton = button(
+        view.youReady ? 'Waiting for opponent…' : 'Ready',
+        actions.onlineReady,
+        true,
+      );
+      readyButton.disabled = view.youReady || view.seats[0] === null || view.seats[1] === null;
+      box.append(
+        el('h2', undefined, `Room ${view.room}`),
+        el('p', undefined, 'Share this code with your opponent.'),
+        ...view.seats.map((seat, i) =>
+          el(
+            'p',
+            seat?.connected === false ? 'muted' : undefined,
+            seat
+              ? `${seat.name}${seat.ready ? ' — ready' : ''}${seat.connected ? '' : ' (away)'}`
+              : `Seat ${String(i + 1)}: waiting for a player…`,
+          ),
+        ),
+        readyButton,
+        button('Leave', actions.onlineLeave),
+      );
+      break;
+    }
+    case 'online-status':
+      box.append(
+        el('h2', undefined, view.title),
+        el('p', undefined, view.subtitle),
+        button(view.button, actions.onlineLeave, true),
+      );
       break;
     case 'handoff':
       box.append(
@@ -101,9 +173,13 @@ export function createOverlays(root: HTMLElement, actions: OverlayActions): Over
       if (key === shown) return;
       shown = key;
       layer.hidden = false;
-      layer.classList.toggle('opaque', view.kind === 'handoff' || view.kind === 'start');
+      layer.classList.toggle(
+        'opaque',
+        view.kind === 'handoff' || view.kind === 'start' || view.kind === 'online-menu',
+      );
       layer.replaceChildren(boxFor(view, actions));
-      layer.querySelector('button')?.focus();
+      // Keep the cursor in a text field the player is typing in; otherwise focus the first button.
+      (layer.querySelector('input') ?? layer.querySelector('button'))?.focus();
     },
   };
 }

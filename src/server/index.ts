@@ -268,6 +268,8 @@ export async function startServer(options: ServerOptions = {}): Promise<GameServ
       const outcome = lobby.room.handle(binding.side, message);
       if (!outcome.ok) {
         fail(socket, outcome.error);
+        // The client may have applied the move optimistically; send it the truth.
+        sendState(lobby, binding.side);
         return;
       }
       if (outcome.fight) {

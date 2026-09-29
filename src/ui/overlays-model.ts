@@ -8,8 +8,10 @@
 import { FIGHT_DAMAGE } from '@sim/data.ts';
 import type { GameState } from '@sim/game.ts';
 import type { Side } from '@sim/types.ts';
+import type { OnlineOverlay } from './online-model.ts';
 
 export type OverlayView =
+  | OnlineOverlay
   | { readonly kind: 'start'; readonly canContinue: boolean }
   | {
       readonly kind: 'handoff';

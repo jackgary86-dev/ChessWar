@@ -120,6 +120,18 @@ describe('lobby', () => {
   });
 });
 
+describe('resync', () => {
+  it('sends the true state back when an intent is refused', async () => {
+    const { a, b } = await pair();
+    a.send({ type: 'ready' });
+    b.send({ type: 'ready' });
+    await a.next('state');
+    a.send({ type: 'place', pieceId: 42, to: { kind: 'bench', slot: 0 } });
+    expect((await a.next('error')).error).toBe('invalid');
+    expect((await a.next('state')).state).toMatchObject({ round: 1, side: 0 });
+  });
+});
+
 describe('reconnect and forfeit', () => {
   it('lets a dropped player rejoin with their token and resends the state', async () => {
     const { a, b, ja, port } = await pair();

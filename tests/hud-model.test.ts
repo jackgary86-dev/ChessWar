@@ -79,6 +79,19 @@ describe('dockView', () => {
     expect(dockView(game, null).cards.every((c) => c.enabled)).toBe(true);
   });
 
+  it('marks cards as unaffordable only when the player could otherwise shop', () => {
+    const game = newGame('ai');
+    game.players[0].econ.gold = 0;
+    const dock = dockView(game, null);
+    expect(dock.cards.every((c) => c.unaffordable && !c.enabled)).toBe(true);
+    expect(dock.cards.every((c) => c.pipSlots === 2)).toBe(true);
+    game.players[0].econ.gold = 99;
+    expect(dockView(game, null).cards.some((c) => c.unaffordable)).toBe(false);
+    game.players[0].econ.gold = 0;
+    game.players[0].isAI = true;
+    expect(dockView(game, null).cards.some((c) => c.unaffordable)).toBe(false);
+  });
+
   it('shows tier odds for the level and the board counter', () => {
     const game = newGame('ai');
     const dock = dockView(game, null);

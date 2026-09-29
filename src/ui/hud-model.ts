@@ -84,7 +84,11 @@ export interface ShopCardView {
   readonly tier: Tier;
   /** Copies of this piece already owned toward the next merge (0-2). */
   readonly pips: number;
+  /** Copies needed for a merge minus one: the number of pip slots to draw. */
+  readonly pipSlots: number;
   readonly enabled: boolean;
+  /** Is it this player's turn to shop but the card costs more than their gold? */
+  readonly unaffordable: boolean;
 }
 
 export interface BenchSlotView {
@@ -126,7 +130,18 @@ export function dockView(game: GameState, selectedPieceId: number | null): DockV
 
   const cards = shop.slots.map((type, slot): ShopCardView => {
     if (type === null) {
-      return { slot, type, name: '', glyph: '', cost: 0, tier: 1, pips: 0, enabled: false };
+      return {
+        slot,
+        type,
+        name: '',
+        glyph: '',
+        cost: 0,
+        tier: 1,
+        pips: 0,
+        pipSlots: MERGE_COUNT - 1,
+        enabled: false,
+        unaffordable: false,
+      };
     }
     const def = PIECES[type];
     return {
@@ -137,7 +152,9 @@ export function dockView(game: GameState, selectedPieceId: number | null): DockV
       cost: def.cost,
       tier: def.tier,
       pips: countOwned(holdings, type, 1) % MERGE_COUNT,
+      pipSlots: MERGE_COUNT - 1,
       enabled: enabled && econ.gold >= def.cost,
+      unaffordable: enabled && econ.gold < def.cost,
     };
   });
 

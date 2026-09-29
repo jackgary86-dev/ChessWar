@@ -10,6 +10,9 @@ import type { GameState } from '@sim/game.ts';
 import type { Side } from '@sim/types.ts';
 import type { OnlineOverlay } from './online-model.ts';
 
+/** How a result screen should feel to the person looking at it. */
+export type ResultTone = 'win' | 'lose' | 'draw';
+
 export type OverlayView =
   | OnlineOverlay
   | { readonly kind: 'start'; readonly canContinue: boolean }
@@ -27,12 +30,14 @@ export type OverlayView =
       readonly subtitle: string;
       readonly lines: readonly string[];
       readonly button: string;
+      readonly tone: ResultTone;
     }
   | {
       readonly kind: 'over';
       readonly title: string;
       readonly subtitle: string;
       readonly button: string;
+      readonly tone: ResultTone;
     };
 
 export interface OverlayContext {
@@ -50,6 +55,15 @@ function otherSide(side: Side): Side {
 
 function plural(count: number, word: string): string {
   return `${String(count)} ${word}${count === 1 ? '' : 's'}`;
+}
+
+/**
+ * Win, lose or draw for the viewer. Against the AI the viewer is Player 1;
+ * with two people on one screen the screen shows the winner's triumph.
+ */
+function toneOf(game: GameState, winner: Side | null): ResultTone {
+  if (winner === null) return 'draw';
+  return game.mode === 'ai' && winner === 1 ? 'lose' : 'win';
 }
 
 /** The overlay to show, or null when the board and HUD are in play. */
@@ -73,6 +87,7 @@ export function overlayView(game: GameState, context: OverlayContext): OverlayVi
       subtitle:
         winner === null ? 'Both commanders fell together.' : `after ${plural(game.round, 'round')}`,
       button: 'New war',
+      tone: toneOf(game, game.gameWinner),
     };
   }
 
@@ -99,6 +114,7 @@ export function overlayView(game: GameState, context: OverlayContext): OverlayVi
       subtitle: `Round ${String(result.round)}`,
       lines,
       button: 'Next round',
+      tone: toneOf(game, result.winner),
     };
   }
   return null;

@@ -95,7 +95,23 @@ describe('overlayView', () => {
       title: 'War won by You',
       subtitle: 'after 1 round',
       button: 'New war',
+      tone: 'win',
     });
+  });
+
+  it('gives result and game-over screens a win, lose or draw tone', () => {
+    const draw = newGame('ai');
+    fight(draw);
+    expect(overlayView(draw, DONE)).toMatchObject({ kind: 'result', tone: 'draw' });
+
+    const lost = newGame('ai');
+    lost.players[0].holdings.board.push({ id: 900, type: 'P', stars: 1, x: 1, y: 3 });
+    lost.players[1].holdings.board.push({ id: 901, type: 'Q', stars: 3, x: 14, y: 3 });
+    lost.players[0].hp = 1;
+    fight(lost);
+    expect(overlayView(lost, DONE)).toMatchObject({ kind: 'result', tone: 'lose' });
+    nextRound(lost);
+    expect(overlayView(lost, DONE)).toMatchObject({ kind: 'over', tone: 'lose' });
   });
 });
 

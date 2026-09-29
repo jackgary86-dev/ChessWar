@@ -694,5 +694,35 @@
   ],
   "body": "The README is the front door of the repo. Build it out now and keep it current for the life of the project.\n\n**Build**\n- [ ] What Chess War is, with a screenshot or GIF\n- [ ] How to play the prototype and the current build\n- [ ] Rules summary with a link to the full spec\n- [ ] Setup: `npm ci`, `npm run dev`, `npm test`, `npm run build`, `npm run sim`\n- [ ] Project layout\n- [ ] How to tune balance in `data.ts`\n- [ ] How to deploy to staging and the live Game Portal\n- [ ] Roadmap with links to each milestone, and the current stage (pre-Alpha / Alpha / Beta / Launched)\n- [ ] How to report a bug (link to the bug template)\n\n**Maintain**\n- [ ] Add a PR template checkbox: \"README updated if setup, rules, scripts or layout changed\"\n- [ ] Update the stage and roadmap when each Alpha / Beta / Launch gate checker closes\n- [ ] Refresh screenshots and GIFs when the Art milestone lands\n- [ ] Review the README at every release tag\n\nKeep this issue open until Launch; close it with the v1.0 README review.",
   "file": "tickets/070-build-and-maintain-the-readme.md"
+ },
+ {
+  "title": "HUD: show On Board and the bench above the shop",
+  "milestone": "M4 Polish",
+  "labels": [
+   "feature",
+   "ui"
+  ],
+  "body": "Swap the two halves of the dock. The `On board X/level` label and the bench row come first, directly under the scoreboard, and the shop header (gold, odds) with its five cards sits below them. The action row (reroll, lock, buy XP, sell, fight) stays at the bottom.\n\n- Reorder the dock children in `src/ui/hud.ts`; no model changes\n- Keep tap-to-place, drag-and-drop and the merge / buy feedback working\n- Check the phone layout (390px) still fits without the shop pushing the bench off screen\n\n**Done when:** in prep the bench is visibly above the shop on desktop and phone, and lint, tests and build pass.",
+  "file": "tickets/071-bench-above-shop.md"
+ },
+ {
+  "title": "Show the combat controls only during a fight",
+  "milestone": "M4 Polish",
+  "labels": [
+   "feature",
+   "ui"
+  ],
+  "body": "The row with `1× 2× 4×`, `Skip to result` and `Sound on/off` is visible on the start screen and all through prep, where none of it does anything. Hide the whole row unless a fight is playing.\n\n- Toggle the `.controls` row from the same refresh that shows and hides overlays; it appears when combat playback starts and disappears when the result is shown\n- Prep, handoff, start, result and game-over screens show no combat controls\n- The sound preference still persists; the toggle is simply only reachable while a fight plays\n\n**Done when:** the row is absent on the start screen and during prep, present during combat, and lint, tests and build pass.",
+  "file": "tickets/072-combat-controls-only-during-fights.md"
+ },
+ {
+  "title": "Shop card names are clipped by the cost badge on narrow screens",
+  "milestone": "M4 Polish",
+  "labels": [
+   "bug",
+   "ui"
+  ],
+  "body": "At widths around 580px and below, the five shop cards shrink until the round cost badge sits on top of the piece name, so \"Pawn\" reads as \"awn\" and \"Bishop\" as \"ishop\". Seen in the stacked (phone) layout during prep.\n\n- Give the card footer room for both the badge and the name (wrap to two lines, shrink the badge, or drop the pips onto their own row) below a breakpoint\n- Check 390px and 580px widths, with 1★, 2★ and 3★ pip counts\n- Keep the tier colour strip and the \"Bought\" state as they are\n\n**Done when:** every piece name is fully readable on every card at 390px and 580px, and lint, tests and build pass.",
+  "file": "tickets/073-shop-card-names-clipped-on-narrow-screens.md"
  }
 ]

@@ -11,6 +11,7 @@
  */
 export * from './battle.ts';
 export * from './board.ts';
+export * from './economy.ts';
 export * from './pathfinding.ts';
 export * from './rng.ts';
 export * from './shop.ts';

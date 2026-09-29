@@ -15,8 +15,8 @@ export interface HudActions {
   buyXp: () => void;
   sell: () => void;
   ready: () => void;
-  /** A bench slot was tapped; the piece id, or null for an empty slot. */
-  selectBench: (pieceId: number | null) => void;
+  /** A bench slot was tapped. */
+  tapBench: (slot: number) => void;
 }
 
 export interface Hud {
@@ -111,7 +111,7 @@ function benchRow(dock: DockView, actions: HudActions): HTMLElement {
       b.dataset.type = slot.piece.type;
     }
     b.addEventListener('click', () => {
-      actions.selectBench(slot.piece?.id ?? null);
+      actions.tapBench(slot.index);
     });
     row.append(b);
   }

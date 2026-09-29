@@ -257,6 +257,40 @@ export function benchPiece(game: GameState, side: Side, pieceId: number): 'ok' |
   return 'ok';
 }
 
+/**
+ * Move a bench or board piece to a specific bench slot. An occupied slot swaps:
+ * a bench occupant trades places, a board piece's square passes to the occupant
+ * (so the board count is unchanged).
+ */
+export function moveToBenchSlot(
+  game: GameState,
+  side: Side,
+  pieceId: number,
+  slot: number,
+): 'ok' | IntentError {
+  const error = prepError(game, side);
+  if (error) return error;
+  const { holdings } = game.players[side];
+  if (!Number.isInteger(slot) || slot < 0 || slot >= holdings.bench.length) return 'invalid';
+  const occupant = holdings.bench[slot] ?? null;
+
+  const fromIndex = holdings.bench.findIndex((p) => p?.id === pieceId);
+  if (fromIndex >= 0) {
+    [holdings.bench[fromIndex], holdings.bench[slot]] = [
+      occupant,
+      holdings.bench[fromIndex] ?? null,
+    ];
+    return 'ok';
+  }
+  const piece = holdings.board.find((p) => p.id === pieceId);
+  if (!piece) return 'invalid';
+  holdings.bench[slot] = { id: piece.id, type: piece.type, stars: piece.stars };
+  holdings.board = occupant
+    ? holdings.board.map((p) => (p === piece ? { ...occupant, x: piece.x, y: piece.y } : p))
+    : holdings.board.filter((p) => p !== piece);
+  return 'ok';
+}
+
 // ---------------------------------------------------------------------------
 // Phase transitions
 // ---------------------------------------------------------------------------

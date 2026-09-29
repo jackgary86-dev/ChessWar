@@ -26,13 +26,15 @@ import {
 } from '@ui/animation.ts';
 import type { UnitSnapshot } from '@ui/animation.ts';
 import { createHud } from '@ui/hud.ts';
+import { attachBoardInput, openSquares, tapBenchSlot, tapSquare } from '@ui/input.ts';
+import type { Selection, TapResult } from '@ui/input.ts';
 import { computeLayout, shouldStack } from '@ui/layout.ts';
 import type { Layout } from '@ui/layout.ts';
 import { drawScene, fitCanvas, prefersReducedMotion, readTheme } from '@ui/render.ts';
 import type { DrawPiece } from '@ui/render.ts';
 import '@ui/theme.css';
 
-// Overlays, tap-to-place and the battle log arrive with later M3 tickets. This
+// Overlays, drag-and-drop and the battle log arrive with later M3 tickets. This
 // entry point wires the HUD to a vs-AI match so the round loop can be played:
 // shop with the HUD, press Fight, watch the animation, repeat.
 const app = document.querySelector<HTMLDivElement>('#app');
@@ -63,7 +65,7 @@ const ctx = maybeCtx;
 
 const aiPrep = createAiPrep('normal');
 const game: GameState = createGame({ mode: 'ai', seed: SEED }, aiPrep);
-let selectedId: number | null = null;
+let selection: Selection | null = null;
 let playback = createPlayback();
 let snapshot: UnitSnapshot[] = [];
 let animating: BattleState | null = null;
@@ -94,13 +96,13 @@ const hud = createHud(hudRoot, {
     refresh();
   },
   sell() {
-    if (selectedId !== null) sellPiece(game, HUMAN, selectedId);
-    selectedId = null;
+    if (selection) sellPiece(game, HUMAN, selection.id);
+    selection = null;
     refresh();
   },
   ready() {
     if (!ready(game) || !game.battle) return;
-    selectedId = null;
+    selection = null;
     animating = game.battle;
     snapshot = snapshotUnits(game.battle);
     playback = createPlayback();
@@ -108,14 +110,19 @@ const hud = createHud(hudRoot, {
     say('');
     refresh();
   },
-  selectBench(pieceId) {
-    selectedId = pieceId === selectedId ? null : pieceId;
-    refresh();
+  tapBench(slot) {
+    applyTap(tapBenchSlot(game, HUMAN, selection, slot));
   },
 });
 
+function applyTap(result: TapResult): void {
+  selection = result.selection;
+  say(result.message ?? '');
+  refresh();
+}
+
 function refresh(): void {
-  hud.update(game, selectedId);
+  hud.update(game, selection?.id ?? null);
 }
 
 for (const speed of BATTLE.speeds) {
@@ -184,16 +191,36 @@ function frame(nowMs: number): void {
   } else {
     pieces = prepPieces();
   }
+  const placing = animating === null && game.phase === 'prep';
+  const picked =
+    placing && selection?.from === 'board'
+      ? game.players[HUMAN].holdings.board.find((p) => p.id === selection?.id)
+      : undefined;
   drawScene(
     ctx,
     layout,
     theme,
-    { pieces, effects, showHp: animating !== null },
+    {
+      pieces,
+      effects,
+      showHp: animating !== null,
+      highlights: placing ? openSquares(game, HUMAN, selection) : [],
+      ...(picked ? { selected: { x: picked.x, y: picked.y } } : {}),
+    },
     nowMs,
     reducedMotion,
   );
   requestAnimationFrame(frame);
 }
+
+attachBoardInput(
+  canvas,
+  () => layout,
+  (pos) => {
+    if (animating || game.phase !== 'prep') return;
+    applyTap(tapSquare(game, HUMAN, selection, pos));
+  },
+);
 
 window.addEventListener('resize', resize);
 resize();

@@ -35,6 +35,8 @@ export interface Scene {
   readonly highlights?: readonly Pos[];
   /** Strike lines, floating numbers and death rings, drawn over the pieces. */
   readonly effects?: readonly Effect[];
+  /** Square of the selected board piece, outlined in brass. */
+  readonly selected?: Pos;
 }
 
 export interface Theme {
@@ -113,6 +115,7 @@ const LABEL_SIZE = 0.2;
 const LABEL_PAD = 0.06;
 const LOW_HP = 0.35;
 const BRIDGE_HEIGHT = 0.34;
+const SELECTION_WIDTH = 0.07;
 const HIGHLIGHT_ALPHA = 0.35;
 const PORTAL_ALPHA_BASE = 0.55;
 const PORTAL_ALPHA_SWING = 0.3;
@@ -237,6 +240,19 @@ function drawHighlights(
     ctx.fillRect(at.x, at.y, layout.cell, layout.cell);
   }
   ctx.globalAlpha = 1;
+}
+
+function drawSelection(
+  ctx: CanvasRenderingContext2D,
+  layout: Layout,
+  theme: Theme,
+  pos: Pos,
+): void {
+  const at = layout.toScreen(pos);
+  const width = Math.max(2, layout.cell * SELECTION_WIDTH);
+  ctx.strokeStyle = theme.brass;
+  ctx.lineWidth = width;
+  ctx.strokeRect(at.x + width / 2, at.y + width / 2, layout.cell - width, layout.cell - width);
 }
 
 function screenAt(layout: Layout, x: number, y: number): { x: number; y: number } {
@@ -382,6 +398,7 @@ export function drawScene(
   drawPortals(ctx, layout, theme, timeMs, reducedMotion);
   drawNotation(ctx, layout, theme);
   if (scene.highlights) drawHighlights(ctx, layout, theme, scene.highlights);
+  if (scene.selected) drawSelection(ctx, layout, theme, scene.selected);
   for (const piece of scene.pieces) {
     drawPiece(ctx, layout, theme, piece, scene.showHp);
   }

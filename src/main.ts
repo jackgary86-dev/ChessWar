@@ -4,6 +4,7 @@ import { BATTLE } from '@sim/data.ts';
 import {
   buyCard,
   buyXpIntent,
+  confirmHandoff,
   createGame,
   lockShop,
   nextRound,
@@ -13,7 +14,7 @@ import {
   skipCombat,
   stepCombat,
 } from '@sim/game.ts';
-import type { GameState } from '@sim/game.ts';
+import type { GameMode, GameState } from '@sim/game.ts';
 import type { Side } from '@sim/types.ts';
 import {
   advancePlayback,
@@ -26,6 +27,8 @@ import {
 } from '@ui/animation.ts';
 import type { UnitSnapshot } from '@ui/animation.ts';
 import { createHud } from '@ui/hud.ts';
+import { createOverlays } from '@ui/overlays.ts';
+import { overlayView, visiblePrepSides } from '@ui/overlays-model.ts';
 import { attachBoardInput, openSquares, tapBenchSlot, tapSquare } from '@ui/input.ts';
 import type { Selection, TapResult } from '@ui/input.ts';
 import { computeLayout, shouldStack } from '@ui/layout.ts';
@@ -34,18 +37,17 @@ import { drawScene, fitCanvas, prefersReducedMotion, readTheme } from '@ui/rende
 import type { DrawPiece } from '@ui/render.ts';
 import '@ui/theme.css';
 
-// Overlays, drag-and-drop and the battle log arrive with later M3 tickets. This
-// entry point wires the HUD to a vs-AI match so the round loop can be played:
-// shop with the HUD, press Fight, watch the animation, repeat.
+// Drag-and-drop and the battle log arrive with later M3 tickets. This entry
+// point wires the HUD and overlays to a match (vs AI or hot-seat) so the round
+// loop can be played: shop, place, Fight, watch the animation, read the result.
 const app = document.querySelector<HTMLDivElement>('#app');
 if (!app) {
   throw new Error('Missing #app root element');
 }
 
-const HUMAN: Side = 0;
 const SEED = Date.now() % 1_000_000;
 const PAGE_MARGIN_PX = 32;
-const RESULT_HOLD_MS = 1200;
+const RESULT_HOLD_MS = 800;
 const BATTLEFIELD_HEIGHT_SHARE = 0.6;
 
 const canvas = document.createElement('canvas');
@@ -64,7 +66,13 @@ if (!maybeCtx) {
 const ctx = maybeCtx;
 
 const aiPrep = createAiPrep('normal');
-const game: GameState = createGame({ mode: 'ai', seed: SEED }, aiPrep);
+let game: GameState = createGame({ mode: 'ai', seed: SEED }, aiPrep);
+let started = false;
+
+/** The side whose prep it is; always Player 1 against the AI. */
+function acting(): Side {
+  return game.active;
+}
 let selection: Selection | null = null;
 let playback = createPlayback();
 let snapshot: UnitSnapshot[] = [];
@@ -77,41 +85,43 @@ function say(message: string): void {
 
 const hud = createHud(hudRoot, {
   buy(slot) {
-    const result = buyCard(game, HUMAN, slot);
+    const result = buyCard(game, acting(), slot);
     if (result === 'bench-full') say('Bench is full. Sell or place a piece first.');
     else if (result === 'gold') say('Not enough gold.');
     else say('');
     refresh();
   },
   reroll() {
-    rerollShop(game, HUMAN);
+    rerollShop(game, acting());
     refresh();
   },
   toggleLock() {
-    lockShop(game, HUMAN);
+    lockShop(game, acting());
     refresh();
   },
   buyXp() {
-    buyXpIntent(game, HUMAN);
+    buyXpIntent(game, acting());
     refresh();
   },
   sell() {
-    if (selection) sellPiece(game, HUMAN, selection.id);
+    if (selection) sellPiece(game, acting(), selection.id);
     selection = null;
     refresh();
   },
   ready() {
-    if (!ready(game) || !game.battle) return;
+    if (!ready(game)) return;
     selection = null;
-    animating = game.battle;
-    snapshot = snapshotUnits(game.battle);
-    playback = createPlayback();
-    resultShownAtMs = null;
     say('');
+    if (game.battle) {
+      animating = game.battle;
+      snapshot = snapshotUnits(game.battle);
+      playback = createPlayback();
+      resultShownAtMs = null;
+    }
     refresh();
   },
   tapBench(slot) {
-    applyTap(tapBenchSlot(game, HUMAN, selection, slot));
+    applyTap(tapBenchSlot(game, acting(), selection, slot));
   },
 });
 
@@ -123,7 +133,32 @@ function applyTap(result: TapResult): void {
 
 function refresh(): void {
   hud.update(game, selection?.id ?? null);
+  overlays.show(overlayView(game, { started, animationDone: animating === null }));
 }
+
+const overlays = createOverlays(app, {
+  start(mode: GameMode) {
+    game = createGame({ mode, seed: SEED + game.round }, aiPrep);
+    started = true;
+    selection = null;
+    animating = null;
+    say('');
+    refresh();
+  },
+  confirmHandoff() {
+    confirmHandoff(game);
+    refresh();
+  },
+  nextRound() {
+    nextRound(game, aiPrep);
+    refresh();
+  },
+  newWar() {
+    started = false;
+    game = createGame({ mode: 'ai', seed: SEED + game.round }, aiPrep);
+    refresh();
+  },
+});
 
 for (const speed of BATTLE.speeds) {
   const button = document.createElement('button');
@@ -143,9 +178,9 @@ skipButton.addEventListener('click', () => {
 });
 speedBar.append(skipButton);
 
-/** Pieces on both boards during prep; the AI's board stays fogged. */
+/** Pieces on the boards that may be seen during prep (the AI's stays fogged). */
 function prepPieces(): DrawPiece[] {
-  return ([HUMAN] as const).flatMap((side) =>
+  return visiblePrepSides(game).flatMap((side) =>
     game.players[side].holdings.board.map((p) => ({
       type: p.type,
       side,
@@ -184,7 +219,6 @@ function frame(nowMs: number): void {
       resultShownAtMs ??= nowMs;
       if (nowMs - resultShownAtMs > RESULT_HOLD_MS) {
         animating = null;
-        if (game.phase === 'result') nextRound(game, aiPrep);
         refresh();
       }
     }
@@ -194,7 +228,7 @@ function frame(nowMs: number): void {
   const placing = animating === null && game.phase === 'prep';
   const picked =
     placing && selection?.from === 'board'
-      ? game.players[HUMAN].holdings.board.find((p) => p.id === selection?.id)
+      ? game.players[acting()].holdings.board.find((p) => p.id === selection?.id)
       : undefined;
   drawScene(
     ctx,
@@ -204,7 +238,7 @@ function frame(nowMs: number): void {
       pieces,
       effects,
       showHp: animating !== null,
-      highlights: placing ? openSquares(game, HUMAN, selection) : [],
+      highlights: placing ? openSquares(game, acting(), selection) : [],
       ...(picked ? { selected: { x: picked.x, y: picked.y } } : {}),
     },
     nowMs,
@@ -218,7 +252,7 @@ attachBoardInput(
   () => layout,
   (pos) => {
     if (animating || game.phase !== 'prep') return;
-    applyTap(tapSquare(game, HUMAN, selection, pos));
+    applyTap(tapSquare(game, acting(), selection, pos));
   },
 );
 

@@ -1,0 +1,20 @@
+# Labels the bug process uses. Create any that are missing, e.g.:
+#   gh label create "sev:blocker" --color b60205 --description "..."
+- name: bug
+  color: d73a4a
+  description: Something does not work as it should
+- name: sev:blocker
+  color: b60205
+  description: Cannot play, data loss, or a crash with no workaround
+- name: sev:major
+  color: d93f0b
+  description: A main feature is broken, or a common bug with a bad workaround
+- name: sev:minor
+  color: fbca04
+  description: Wrong but playable, or rare, with an easy workaround
+- name: sev:cosmetic
+  color: c5def5
+  description: Looks or reads wrong, no effect on play
+- name: needs-triage
+  color: ededed
+  description: New bug that has no severity and milestone yet

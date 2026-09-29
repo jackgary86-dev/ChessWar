@@ -20,7 +20,7 @@ describe('parseClientMessage', () => {
   it('parses join and tidies the name', () => {
     expect(parseClientMessage('{"type":"join","room":"abc","name":"  Ann  "}')).toEqual({
       type: 'join',
-      room: 'abc',
+      room: 'ABC',
       name: 'Ann',
     });
     expect(parseClientMessage('{"type":"join","room":"abc"}')).toMatchObject({ name: 'Player' });
@@ -40,6 +40,21 @@ describe('parseClientMessage', () => {
     '{"type":"ready","gold":999}x',
   ])('rejects %s', (raw) => {
     expect(parseClientMessage(raw)).toBeNull();
+  });
+
+  it('parses create and rejoin, upper-casing room codes', () => {
+    expect(parseClientMessage('{"type":"create","name":"Ann"}')).toEqual({
+      type: 'create',
+      name: 'Ann',
+    });
+    expect(parseClientMessage('{"type":"rejoin","room":"ab2c","token":"t0k"}')).toEqual({
+      type: 'rejoin',
+      room: 'AB2C',
+      token: 't0k',
+    });
+    expect(parseClientMessage('{"type":"join","room":"ab2c"}')).toMatchObject({ room: 'AB2C' });
+    expect(parseClientMessage('{"type":"rejoin","room":"AB2C"}')).toBeNull();
+    expect(parseClientMessage('{"type":"rejoin","room":"AB2C","token":""}')).toBeNull();
   });
 
   it('ignores extra fields a client might add, such as claimed state', () => {

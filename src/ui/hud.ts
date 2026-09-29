@@ -19,7 +19,16 @@ export interface HudActions {
   tapBench: (slot: number) => void;
 }
 
+/** One-shot feedback the next `update` plays: bench merges, a level-up, a shop buy. */
+export interface Celebration {
+  readonly benchSlots?: readonly number[];
+  readonly levelUpSide?: number;
+  readonly boughtSlot?: number;
+}
+
 export interface Hud {
+  /** Mark feedback to play on the next `update`. */
+  celebrate: (celebration: Celebration) => void;
   update: (game: GameState, selectedPieceId: number | null) => void;
 }
 
@@ -44,8 +53,9 @@ function button(label: string, onClick: () => void, enabled: boolean): HTMLButto
   return b;
 }
 
-function playerCard(view: PlayerCardView): HTMLElement {
+function playerCard(view: PlayerCardView, levelUp: boolean): HTMLElement {
   const card = el('div', view.active ? 'pcard active' : 'pcard');
+  if (levelUp) card.classList.add('levelup');
   const name = el('div', 'nm');
   name.append(el('span', `chip s${String(view.side)}`), el('span', 'txt', view.name));
   const bar = el('div', 'hpbar');
@@ -66,11 +76,13 @@ function playerCard(view: PlayerCardView): HTMLElement {
   return card;
 }
 
-function shopRow(dock: DockView, actions: HudActions): HTMLElement {
+function shopRow(dock: DockView, actions: HudActions, boughtSlot: number | undefined): HTMLElement {
   const row = el('div', 'shop');
   for (const card of dock.cards) {
     if (card.type === null) {
-      row.append(el('div', 'card empty', 'Bought'));
+      row.append(
+        el('div', card.slot === boughtSlot ? 'card empty bought' : 'card empty', 'Bought'),
+      );
       continue;
     }
     const b = el('button', `card t${String(card.tier)}`);
@@ -95,7 +107,7 @@ function shopRow(dock: DockView, actions: HudActions): HTMLElement {
   return row;
 }
 
-function benchRow(dock: DockView, actions: HudActions): HTMLElement {
+function benchRow(dock: DockView, actions: HudActions, popped: readonly number[]): HTMLElement {
   const row = el('div', 'bench');
   for (const slot of dock.bench) {
     const b = el('button', slot.piece ? 'slot full' : 'slot');
@@ -104,6 +116,7 @@ function benchRow(dock: DockView, actions: HudActions): HTMLElement {
     b.setAttribute('aria-label', slot.name);
     b.dataset.slot = String(slot.index);
     if (slot.selected) b.classList.add('sel');
+    if (popped.includes(slot.index)) b.classList.add('merged');
     if (slot.piece) {
       b.append(
         el('span', 'g', `${slot.glyph}${VS_TEXT}`),
@@ -150,10 +163,21 @@ export function createHud(root: HTMLElement, actions: HudActions): Hud {
   const dock = el('div', 'dock');
   root.append(scores, dock);
 
+  let pending: Celebration = {};
+
   return {
+    celebrate(celebration) {
+      pending = celebration;
+    },
     update(game, selectedPieceId) {
+      const play = pending;
+      pending = {};
       const [a, b] = scoreboardView(game);
-      scores.replaceChildren(playerCard(a), el('div', 'vs', 'VS'), playerCard(b));
+      scores.replaceChildren(
+        playerCard(a, play.levelUpSide === a.side),
+        el('div', 'vs', 'VS'),
+        playerCard(b, play.levelUpSide === b.side),
+      );
 
       const view = dockView(game, selectedPieceId);
       const head = el('div', 'dockhead');
@@ -172,9 +196,9 @@ export function createHud(root: HTMLElement, actions: HudActions): Hud {
       dock.classList.toggle('off', !view.enabled);
       dock.replaceChildren(
         head,
-        shopRow(view, actions),
+        shopRow(view, actions, play.boughtSlot),
         cap,
-        benchRow(view, actions),
+        benchRow(view, actions, play.benchSlots ?? []),
         actionRow(view, actions),
       );
     },

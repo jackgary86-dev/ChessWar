@@ -20,6 +20,7 @@ import {
   drawAbility,
   drawFlash,
   drawImpact,
+  drawMerge,
   drawShatter,
   floatScale,
   floatStyle,
@@ -455,6 +456,16 @@ function drawEffects(
         centerOf(layout, effect.pos),
         cell,
         toneColor(theme, effect.tone),
+        effect.progress,
+      );
+    } else if (effect.kind === 'merge') {
+      ctx.globalAlpha = 1;
+      drawMerge(
+        ctx,
+        centerOf(layout, effect.pos),
+        cell,
+        theme.brass,
+        effect.stars,
         effect.progress,
       );
     } else if (effect.kind === 'ability') {

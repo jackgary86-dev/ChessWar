@@ -1,4 +1,5 @@
 import type { BattleState } from '@sim/battle.ts';
+import type { Holdings } from '@sim/shop.ts';
 import { createAiPrep } from '@sim/ai.ts';
 import { BATTLE } from '@sim/data.ts';
 import {
@@ -26,6 +27,8 @@ import {
   snapshotUnits,
 } from '@ui/animation.ts';
 import type { UnitSnapshot } from '@ui/animation.ts';
+import { FEEDBACK_MS, activeMerges, detectPrepFeedback } from '@ui/feedback.ts';
+import type { TimedMerge } from '@ui/feedback.ts';
 import { createHud } from '@ui/hud.ts';
 import { createFieldManual, createLogPanel } from '@ui/log.ts';
 import { battleLog, detectMerges, resultLogLine } from '@ui/log-model.ts';
@@ -120,12 +123,35 @@ let resultShownAtMs: number | null = null;
 let loggedLines = 0;
 let cuedEvents = 0;
 const sound = createSound(storage);
+/** Board merge bursts still playing during prep. */
+let mergeBursts: TimedMerge[] = [];
 let dropSquare: Pos | undefined;
 const logPanel = createLogPanel(infoRoot);
 createFieldManual(infoRoot);
 
 function say(message: string): void {
   toast.textContent = message;
+}
+
+/** Play merge and level-up feedback for the change from `before` to the acting player's state now. */
+function celebrate(
+  before: Holdings,
+  levelBefore: number,
+  after: Holdings,
+  levelAfter: number,
+  boughtSlot?: number,
+): void {
+  const fx = detectPrepFeedback(before, after, levelBefore, levelAfter);
+  const now = performance.now();
+  for (const m of fx.merges) {
+    if (m.where.kind === 'board')
+      mergeBursts.push({ pos: m.where.pos, stars: m.stars, startMs: now });
+  }
+  hud.celebrate({
+    benchSlots: fx.merges.flatMap((m) => (m.where.kind === 'bench' ? [m.where.slot] : [])),
+    ...(fx.levelUp ? { levelUpSide: acting() } : {}),
+    ...(boughtSlot === undefined ? {} : { boughtSlot }),
+  });
 }
 
 const hud = createHud(hudRoot, {
@@ -137,6 +163,14 @@ const hud = createHud(hudRoot, {
     const before = structuredClone(game.players[acting()].holdings);
     const result = buyCard(game, acting(), slot);
     const merges = detectMerges(before, game.players[acting()].holdings);
+    const level = game.players[acting()].econ.level;
+    celebrate(
+      before,
+      level,
+      game.players[acting()].holdings,
+      level,
+      result === 'ok' ? slot : undefined,
+    );
     logPanel.add(merges);
     if (merges.length > 0) sound.play('merge');
     else if (result === 'ok') sound.play('buy');
@@ -166,7 +200,11 @@ const hud = createHud(hudRoot, {
       net?.send({ type: 'buyXP' });
       return;
     }
+    const before = structuredClone(game.players[acting()].holdings);
+    const levelBefore = game.players[acting()].econ.level;
     buyXpIntent(game, acting());
+    const player = game.players[acting()];
+    celebrate(before, levelBefore, player.holdings, player.econ.level);
     refresh();
   },
   sell() {
@@ -264,6 +302,12 @@ function syncOnline(): void {
   const before = game.players[acting()].holdings;
   const next = mirrorGame(online.view);
   const merges = detectMerges(before, next.players[next.active].holdings);
+  celebrate(
+    before,
+    game.players[acting()].econ.level,
+    next.players[next.active].holdings,
+    next.players[next.active].econ.level,
+  );
   logPanel.add(merges);
   if (merges.length > 0) sound.play('merge');
   game = next;
@@ -448,7 +492,7 @@ function frame(nowMs: number): void {
   lastMs = nowMs;
 
   let pieces: readonly DrawPiece[];
-  let effects: ReturnType<typeof frameAt>['effects'] = [];
+  let effects: ReturnType<typeof frameAt>['effects'];
   if (animating) {
     const battle = animating;
     advancePlayback(playback, dtMs, battle, () => {
@@ -476,6 +520,10 @@ function frame(nowMs: number): void {
     }
   } else {
     pieces = prepPieces();
+    mergeBursts = mergeBursts.filter((m) => nowMs - m.startMs < FEEDBACK_MS);
+    effects = reducedMotion
+      ? []
+      : activeMerges(mergeBursts, nowMs).map((m) => ({ kind: 'merge' as const, ...m }));
   }
   const placing = animating === null && game.phase === 'prep';
   const picked =

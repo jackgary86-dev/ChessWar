@@ -14,7 +14,10 @@ function setup(): { dir: string; env: NodeJS.ProcessEnv } {
   execFileSync('zip', ['-q', join(dir, 'rel', 'chess-war-v0.9.0.zip'), 'index.html'], {
     cwd: join(dir, 'src'),
   });
-  return { dir, env: { ...process.env, WEB_ROOT: join(dir, 'live'), RELEASES_DIR: join(dir, 'rel') } };
+  return {
+    dir,
+    env: { ...process.env, WEB_ROOT: join(dir, 'live'), RELEASES_DIR: join(dir, 'rel') },
+  };
 }
 
 describe('scripts/rollback.sh', () => {

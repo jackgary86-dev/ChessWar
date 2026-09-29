@@ -9,4 +9,5 @@
  *   types.ts, data.ts, rng.ts, board.ts, battle.ts,
  *   economy.ts, shop.ts, ai.ts, game.ts
  */
+export * from './rng.ts';
 export const GAME_NAME = 'Chess War';

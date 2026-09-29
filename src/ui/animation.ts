@@ -12,6 +12,11 @@ import type { BattleEvent, BattleState } from '@sim/battle.ts';
 import type { Pos } from '@sim/board.ts';
 import type { PieceType, Side, StarLevel } from '@sim/types.ts';
 import type { DrawPiece } from './render.ts';
+import { FORK_DELAY, strikeStyle } from './vfx.ts';
+import type { AbilityVfx } from './vfx.ts';
+
+const ORTHOGONAL_STEP = 1;
+const STEP_EPSILON = 0.01;
 
 export type PlaybackSpeed = (typeof BATTLE.speeds)[number];
 
@@ -23,6 +28,10 @@ export type Effect =
       readonly to: Pos;
       /** Attacker's side, or 'heal' for a Blessing beam. */
       readonly tone: Side | 'heal';
+      /** What drew the line: sets its weight (see `vfx.ts`). */
+      readonly via: 'strike' | 'fork' | 'pierce' | 'heal';
+      /** Type of the piece that struck or healed. */
+      readonly piece: PieceType;
       /** 0 at the start of the effect, 1 when it has finished. */
       readonly progress: number;
     }
@@ -35,6 +44,33 @@ export type Effect =
     }
   | {
       readonly kind: 'ring';
+      readonly pos: Pos;
+      readonly progress: number;
+    }
+  | {
+      /** A knight's landing starburst on its target. */
+      readonly kind: 'impact';
+      readonly pos: Pos;
+      readonly tone: Side;
+      readonly progress: number;
+    }
+  | {
+      /** White flash over a struck piece. */
+      readonly kind: 'flash';
+      readonly pos: Pos;
+      readonly progress: number;
+    }
+  | {
+      /** A dying piece breaking apart, in its own side's color. */
+      readonly kind: 'shatter';
+      readonly pos: Pos;
+      readonly tone: Side;
+      readonly progress: number;
+    }
+  | {
+      /** Shield Wall / Fortress on the struck piece, Blessing on the healed one. */
+      readonly kind: 'ability';
+      readonly ability: AbilityVfx;
       readonly pos: Pos;
       readonly progress: number;
     }
@@ -106,6 +142,20 @@ interface UnitState {
   diedAt: number | null;
 }
 
+/** A 2★+ Rook (Fortress) or a Pawn with a friend orthogonally beside it (Shield Wall). */
+function guardOf(target: UnitState, units: ReadonlyMap<number, UnitState>): boolean {
+  if (target.snap.stars === 1) return false;
+  if (target.snap.type === 'R') return true;
+  if (target.snap.type !== 'P') return false;
+  for (const other of units.values()) {
+    if (other === target || other.snap.side !== target.snap.side) continue;
+    if (other.hp <= 0) continue;
+    const dist = Math.abs(other.x - target.x) + Math.abs(other.y - target.y);
+    if (Math.abs(dist - ORTHOGONAL_STEP) < STEP_EPSILON) return true;
+  }
+  return false;
+}
+
 /**
  * What to draw at tick time `t`. With `reducedMotion`, pieces snap between
  * squares (no easing or hop) and floating text does not drift.
@@ -153,14 +203,44 @@ export function frameAt(
         const target = units.get(event.target);
         if (!attacker || !target) break;
         if (progress >= HALF) target.hp = event.targetHp;
-        if (age < LINE_LIFETIME) {
-          effects.push({
-            kind: 'line',
-            from: { x: attacker.x, y: attacker.y },
-            to: { x: target.x, y: target.y },
-            tone: attacker.snap.side,
-            progress: age / LINE_LIFETIME,
-          });
+        const strikeAge = event.via === 'fork' ? age - FORK_DELAY : age;
+        const shape = strikeStyle(attacker.snap.type).shape;
+        if (strikeAge > 0 && strikeAge < LINE_LIFETIME) {
+          const lineProgress = strikeAge / LINE_LIFETIME;
+          if (shape === 'impact') {
+            effects.push({
+              kind: 'impact',
+              pos: { x: target.x, y: target.y },
+              tone: attacker.snap.side,
+              progress: lineProgress,
+            });
+          }
+          if (shape !== 'impact' || event.via === 'fork') {
+            effects.push({
+              kind: 'line',
+              from: { x: attacker.x, y: attacker.y },
+              to: { x: target.x, y: target.y },
+              tone: attacker.snap.side,
+              via: event.via,
+              piece: attacker.snap.type,
+              progress: lineProgress,
+            });
+          }
+          if (!reducedMotion) {
+            effects.push({
+              kind: 'flash',
+              pos: { x: target.x, y: target.y },
+              progress: lineProgress,
+            });
+          }
+          if (guardOf(target, units)) {
+            effects.push({
+              kind: 'ability',
+              ability: target.snap.type === 'R' ? 'fortress' : 'shield',
+              pos: { x: target.x, y: target.y },
+              progress: lineProgress,
+            });
+          }
         }
         if (age < FLOAT_LIFETIME) {
           effects.push({
@@ -184,6 +264,14 @@ export function frameAt(
             from: { x: healer.x, y: healer.y },
             to: { x: target.x, y: target.y },
             tone: 'heal',
+            via: 'heal',
+            piece: healer.snap.type,
+            progress: age / LINE_LIFETIME,
+          });
+          effects.push({
+            kind: 'ability',
+            ability: 'blessing',
+            pos: { x: target.x, y: target.y },
             progress: age / LINE_LIFETIME,
           });
         }
@@ -204,6 +292,14 @@ export function frameAt(
         unit.diedAt = event.tick - FULL;
         if (age < RING_LIFETIME) {
           effects.push({ kind: 'ring', pos: event.pos, progress: age / RING_LIFETIME });
+          if (!reducedMotion) {
+            effects.push({
+              kind: 'shatter',
+              pos: event.pos,
+              tone: unit.snap.side,
+              progress: age / RING_LIFETIME,
+            });
+          }
         }
         break;
       }

@@ -44,6 +44,8 @@ npm run server    online 1v1 WebSocket server (PORT env var, default 8787): crea
 npm run sim       headless AI-vs-AI balance runner, e.g. npm run sim -- --games 500
 ```
 
+Releases are tagged `vX.Y.Z` and a workflow attaches `chess-war-vX.Y.Z.zip` to the GitHub Release; see [`docs/RELEASING.md`](docs/RELEASING.md) and `CHANGELOG.md`.
+
 CI runs lint, test, build and a 1-game sim on every push and pull request.
 
 ## Repository layout

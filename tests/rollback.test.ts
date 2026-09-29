@@ -24,7 +24,7 @@ describe('scripts/rollback.sh', () => {
     expect(readFileSync(join(dir, 'live', 'index.html'), 'utf8')).toBe('previous');
     const backup = readdirSync(dir).find((n) => n.startsWith('live.before-rollback-'));
     expect(backup).toBeDefined();
-    expect(readFileSync(join(dir, backup!, 'index.html'), 'utf8')).toBe('current');
+    expect(readFileSync(join(dir, String(backup), 'index.html'), 'utf8')).toBe('current');
   });
 
   it('changes nothing when the version has no zip or is malformed', () => {

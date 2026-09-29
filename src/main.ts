@@ -30,6 +30,7 @@ import { createHud } from '@ui/hud.ts';
 import { createFieldManual, createLogPanel } from '@ui/log.ts';
 import { battleLog, detectMerges, resultLogLine } from '@ui/log-model.ts';
 import { createOverlays } from '@ui/overlays.ts';
+import { browserStorage, clearSave, loadGame, saveGame } from '@ui/storage.ts';
 import { overlayView, visiblePrepSides } from '@ui/overlays-model.ts';
 import { applyDrop, attachDrag } from '@ui/drag.ts';
 import { attachBoardInput, openSquares, tapBenchSlot, tapSquare } from '@ui/input.ts';
@@ -74,6 +75,15 @@ const ctx = maybeCtx;
 const aiPrep = createAiPrep('normal');
 let game: GameState = createGame({ mode: 'ai', seed: SEED }, aiPrep);
 let started = false;
+const storage = browserStorage();
+let hasSave = loadGame(storage) !== null;
+
+/** Save at the start of a prep phase, or drop the save once the war is over. */
+function persist(): void {
+  if (game.phase === 'over') clearSave(storage);
+  else saveGame(storage, game);
+  hasSave = loadGame(storage) !== null;
+}
 
 /** The side whose prep it is; always Player 1 against the AI. */
 function acting(): Side {
@@ -146,12 +156,30 @@ function applyTap(result: TapResult): void {
 
 function refresh(): void {
   hud.update(game, selection?.id ?? null);
-  overlays.show(overlayView(game, { started, animationDone: animating === null }));
+  overlays.show(
+    overlayView(game, { started, animationDone: animating === null, canContinue: hasSave }),
+  );
 }
 
 const overlays = createOverlays(app, {
   start(mode: GameMode) {
     game = createGame({ mode, seed: SEED + game.round }, aiPrep);
+    started = true;
+    logPanel.clear();
+    selection = null;
+    animating = null;
+    say('');
+    persist();
+    refresh();
+  },
+  continueSaved() {
+    const saved = loadGame(storage);
+    if (!saved) {
+      hasSave = false;
+      refresh();
+      return;
+    }
+    game = saved;
     started = true;
     logPanel.clear();
     selection = null;
@@ -165,6 +193,7 @@ const overlays = createOverlays(app, {
   },
   nextRound() {
     nextRound(game, aiPrep);
+    persist();
     refresh();
   },
   newWar() {

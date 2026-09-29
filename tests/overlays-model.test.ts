@@ -31,7 +31,14 @@ function fight(game: GameState): void {
 describe('overlayView', () => {
   it('shows the start screen until a mode is chosen', () => {
     const game = newGame('ai');
-    expect(overlayView(game, { started: false, animationDone: true })).toEqual({ kind: 'start' });
+    expect(overlayView(game, { started: false, animationDone: true })).toEqual({
+      kind: 'start',
+      canContinue: false,
+    });
+    expect(overlayView(game, { started: false, animationDone: true, canContinue: true })).toEqual({
+      kind: 'start',
+      canContinue: true,
+    });
     expect(overlayView(game, DONE)).toBeNull();
   });
 

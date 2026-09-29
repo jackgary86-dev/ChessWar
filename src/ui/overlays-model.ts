@@ -10,7 +10,7 @@ import type { GameState } from '@sim/game.ts';
 import type { Side } from '@sim/types.ts';
 
 export type OverlayView =
-  | { readonly kind: 'start' }
+  | { readonly kind: 'start'; readonly canContinue: boolean }
   | {
       readonly kind: 'handoff';
       readonly round: number;
@@ -38,6 +38,8 @@ export interface OverlayContext {
   readonly started: boolean;
   /** The fight animation has finished playing, so its result may show. */
   readonly animationDone: boolean;
+  /** A saved match is available to resume. */
+  readonly canContinue?: boolean;
 }
 
 function otherSide(side: Side): Side {
@@ -50,7 +52,7 @@ function plural(count: number, word: string): string {
 
 /** The overlay to show, or null when the board and HUD are in play. */
 export function overlayView(game: GameState, context: OverlayContext): OverlayView | null {
-  if (!context.started) return { kind: 'start' };
+  if (!context.started) return { kind: 'start', canContinue: context.canContinue === true };
 
   if (game.phase === 'handoff') {
     return {

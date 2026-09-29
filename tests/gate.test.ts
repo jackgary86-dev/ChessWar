@@ -3,6 +3,10 @@ import { describe, expect, it } from 'vitest';
 import { playMirroredPair } from '@sim/match.ts';
 import {
   ALPHA_COMMANDS,
+  LAUNCH_COMMANDS,
+  LAUNCH_MANUAL,
+  LAUNCH_REQUIRED_FILES,
+  checkVersion,
   BETA_COMMANDS,
   BETA_MANUAL,
   BETA_REQUIRED_FILES,
@@ -80,5 +84,25 @@ describe('beta gate checker', () => {
 
   it('plays mirrored pairs so each seed is seated both ways', () => {
     expect(playMirroredPair(1)).toHaveLength(2);
+  });
+});
+
+describe('launch gate checker', () => {
+  it('requires everything Beta does plus the release material', () => {
+    expect(LAUNCH_REQUIRED_FILES).toEqual(expect.arrayContaining([...BETA_REQUIRED_FILES]));
+    expect(LAUNCH_REQUIRED_FILES).toContain('CHANGELOG.md');
+    expect(LAUNCH_COMMANDS.map((c) => c.name)).toEqual(
+      expect.arrayContaining(['fuzz test', 'release notes extract']),
+    );
+  });
+
+  it('lists the ticket’s human sign-offs', () => {
+    expect(LAUNCH_MANUAL.some((m) => m.includes('Connor'))).toBe(true);
+    expect(LAUNCH_MANUAL.some((m) => m.includes('Rollback'))).toBe(true);
+  });
+
+  it('fails the version check for a 0.x build or a missing changelog section', () => {
+    const results = checkVersion(process.cwd(), '9.9.9');
+    expect(results.every((r) => !r.ok)).toBe(true);
   });
 });

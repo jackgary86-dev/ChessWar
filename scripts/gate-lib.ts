@@ -2,7 +2,7 @@
  * Release gate checks: a list of automated checks plus the manual items a person
  * still has to confirm. Pure data and small helpers, so tests can exercise them.
  */
-import { existsSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { playAiMatch, playMirroredPair, summarize } from '../src/sim/match.ts';
@@ -165,4 +165,57 @@ export function playBalanceGames(games: number, seed = 1): MatchReport[] {
     reports.push(...playMirroredPair(seed + i).slice(0, games - reports.length));
   }
   return reports;
+}
+
+export const LAUNCH_VERSION = '1.0.0';
+
+/** Launch needs everything Beta does, plus the release and rollback material. */
+export const LAUNCH_REQUIRED_FILES: readonly string[] = [
+  ...BETA_REQUIRED_FILES,
+  'CHANGELOG.md',
+  'docs/RELEASING.md',
+  '.github/workflows/release.yml',
+  'assets/brand/logo-wordmark.svg',
+  'public/favicon.ico',
+  'public/manifest.webmanifest',
+];
+
+export const LAUNCH_COMMANDS: readonly CommandCheck[] = [
+  ...BETA_COMMANDS,
+  { name: 'fuzz test', command: 'npm', args: ['run', 'fuzz'] },
+  {
+    name: 'release notes extract',
+    command: 'npm',
+    args: ['run', 'release-notes', '--', LAUNCH_VERSION],
+  },
+];
+
+export const LAUNCH_MANUAL: readonly string[] = [
+  'All Beta must-fix issues are closed; no open sev:blocker or sev:major',
+  'Full bug-check pass done by people on the release candidate (browsers and devices, performance on a phone)',
+  'Release v1.0.0 is tagged and the GitHub Release has the zip and the changelog notes',
+  'Rollback plan has been rehearsed once against the real portal (run the rollback script, confirm the old build is served)',
+  'Logo, favicon and title screen are final (look at them in a browser)',
+  'Connor has signed off on the live server deploy',
+];
+
+/** The release candidate must say 1.0.0 and have a CHANGELOG section for it. */
+export function checkVersion(root: string, version: string = LAUNCH_VERSION): CheckResult[] {
+  const pkgPath = join(root, 'package.json');
+  const pkg = JSON.parse(readFileSync(pkgPath, 'utf8')) as { version?: string };
+  const changelogPath = join(root, 'CHANGELOG.md');
+  const changelog = existsSync(changelogPath) ? readFileSync(changelogPath, 'utf8') : '';
+  const hasSection = new RegExp(`^## \\[${version.replaceAll('.', '\\.')}\\]`, 'm').test(changelog);
+  return [
+    {
+      name: `package.json version is ${version}`,
+      ok: pkg.version === version,
+      detail: `is ${pkg.version ?? 'missing'}`,
+    },
+    {
+      name: `CHANGELOG.md has a [${version}] section`,
+      ok: hasSection,
+      detail: hasSection ? 'present' : 'missing',
+    },
+  ];
 }

@@ -4,11 +4,23 @@
  * The pool is shared by both players. Cards sitting in a shop are out of the
  * pool; unbought cards go back on reroll. Piece counts are conserved: every
  * copy is in the pool, a shop slot, or a player's hands (bench / board).
+ *
+ * Also here: buying, selling, the bench and 3-copy merging.
  */
-import { ECONOMY, PIECES, PIECE_ORDER, PLAYER, POOL_SIZE, TIER_ODDS } from './data.ts';
+import {
+  ECONOMY,
+  MERGE_COUNT,
+  PIECES,
+  PIECE_ORDER,
+  PLAYER,
+  POOL_SIZE,
+  TIER_ODDS,
+  copiesForStars,
+  sellValue,
+} from './data.ts';
 import { int } from './rng.ts';
 import type { Rng } from './rng.ts';
-import type { Level, PieceType, Tier } from './types.ts';
+import type { Level, PieceType, StarLevel, Tier } from './types.ts';
 
 /** Copies of each piece type left to draw. */
 export type Pool = Record<PieceType, number>;
@@ -136,4 +148,126 @@ export function takeCard(shop: ShopState, slot: number): PieceType | null {
   const card = shop.slots[slot] ?? null;
   if (card !== null) shop.slots[slot] = null;
   return card;
+}
+
+// ---------------------------------------------------------------------------
+// Owned pieces: bench, board, buying, selling, merging
+// ---------------------------------------------------------------------------
+
+/** A piece a player owns, on the bench or on the board. */
+export interface OwnedPiece {
+  readonly id: number;
+  readonly type: PieceType;
+  stars: StarLevel;
+}
+
+/** An owned piece standing on its player's board (world coordinates). */
+export interface PlacedPiece extends OwnedPiece {
+  x: number;
+  y: number;
+}
+
+/** Everything a player owns that buying, selling and merging touch. */
+export interface Holdings extends Wallet {
+  /** Bench slots; null when empty. */
+  bench: (OwnedPiece | null)[];
+  board: PlacedPiece[];
+  /** Next piece id to hand out. */
+  nextId: number;
+}
+
+export type BuyResult = 'ok' | 'empty-slot' | 'gold' | 'bench-full';
+
+export function createHoldings(gold = 0): Holdings {
+  return {
+    gold,
+    bench: Array.from({ length: PLAYER.benchSize }, () => null),
+    board: [],
+    nextId: 1,
+  };
+}
+
+/** Every piece owned, board first (a board copy is the preferred merge survivor). */
+function ownedPieces(holdings: Holdings): OwnedPiece[] {
+  return [...holdings.board, ...holdings.bench.filter((p): p is OwnedPiece => p !== null)];
+}
+
+/** How many pieces of a type and star level the player owns. */
+export function countOwned(holdings: Holdings, type: PieceType, stars: StarLevel): number {
+  return ownedPieces(holdings).filter((p) => p.type === type && p.stars === stars).length;
+}
+
+/**
+ * Merge every set of 3 same-type, same-star pieces into one piece a star
+ * higher, chaining up to 3★. The survivor stays where a copy stood, preferring
+ * a board copy. `extra` is a piece that has no bench slot yet (a full-bench
+ * merge buy); it is only ever consumed, never kept. Returns pieces upgraded.
+ */
+export function mergeAll(holdings: Holdings, extra: OwnedPiece | null = null): OwnedPiece[] {
+  const upgraded: OwnedPiece[] = [];
+  let leftover = extra;
+  for (let merged = true; merged;) {
+    merged = false;
+    const pool: OwnedPiece[] = [...ownedPieces(holdings), ...(leftover ? [leftover] : [])];
+    for (const type of PIECE_ORDER) {
+      for (const stars of [1, 2] as const) {
+        const same = pool.filter((p) => p.type === type && p.stars === stars);
+        if (same.length < MERGE_COUNT) continue;
+        const [keep, ...consumed] = same.slice(0, MERGE_COUNT);
+        if (keep === undefined) continue;
+        for (const gone of consumed) {
+          if (gone === leftover) leftover = null;
+          holdings.board = holdings.board.filter((p) => p !== gone);
+          holdings.bench = holdings.bench.map((p) => (p === gone ? null : p));
+        }
+        keep.stars = (stars + 1) as StarLevel;
+        upgraded.push(keep);
+        merged = true;
+        break;
+      }
+      if (merged) break;
+    }
+  }
+  return upgraded;
+}
+
+/** Can the player take another copy: a free bench slot, or the buy completes a merge. */
+export function canTake(holdings: Holdings, type: PieceType): boolean {
+  return holdings.bench.includes(null) || countOwned(holdings, type, 1) >= MERGE_COUNT - 1;
+}
+
+/** Buy the card in a shop slot: pays its cost, benches it and merges. */
+export function buy(shop: ShopState, holdings: Holdings, slot: number): BuyResult {
+  const type = shop.slots[slot] ?? null;
+  if (type === null) return 'empty-slot';
+  if (holdings.gold < PIECES[type].cost) return 'gold';
+  if (!canTake(holdings, type)) return 'bench-full';
+  takeCard(shop, slot);
+  holdings.gold -= PIECES[type].cost;
+  const piece: OwnedPiece = { id: holdings.nextId, type, stars: 1 };
+  holdings.nextId += 1;
+  const free = holdings.bench.indexOf(null);
+  if (free >= 0) {
+    holdings.bench[free] = piece;
+    mergeAll(holdings);
+  } else {
+    mergeAll(holdings, piece);
+  }
+  return 'ok';
+}
+
+/**
+ * Sell a piece by id from the bench or board: refunds cost × 3^(stars−1) gold
+ * and returns that many copies to the pool. Returns the refund, or null if the
+ * piece is not owned.
+ */
+export function sell(pool: Pool, holdings: Holdings, id: number): number | null {
+  const piece = ownedPieces(holdings).find((p) => p.id === id);
+  if (piece === undefined) return null;
+  holdings.board = holdings.board.filter((p) => p !== piece);
+  holdings.bench = holdings.bench.map((p) => (p === piece ? null : p));
+  const refund = sellValue(piece.type, piece.stars);
+  holdings.gold += refund;
+  returnToPool(pool, piece.type, copiesForStars(piece.stars));
+  return refund;
 }

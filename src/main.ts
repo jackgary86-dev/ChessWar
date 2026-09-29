@@ -35,6 +35,19 @@ import { cuesForEvents, roundCue } from '@ui/sound-model.ts';
 import { browserStorage, clearSave, loadGame, saveGame } from '@ui/storage.ts';
 import { overlayView, visiblePrepSides } from '@ui/overlays-model.ts';
 import { applyDrop, attachDrag } from '@ui/drag.ts';
+import type { DropTarget } from '@ui/drag.ts';
+import { createNetClient } from '@ui/net.ts';
+import type { NetClient, SocketLike } from '@ui/net.ts';
+import {
+  battleFromFight,
+  connectionNote,
+  initialOnlineState,
+  mirrorGame,
+  onlineOverlay,
+  onlineReduce,
+  withResult,
+} from '@ui/online-model.ts';
+import type { OnlineEvent, OnlineState } from '@ui/online-model.ts';
 import { attachBoardInput, openSquares, tapBenchSlot, tapSquare } from '@ui/input.ts';
 import type { Selection, TapResult } from '@ui/input.ts';
 import type { Pos } from '@sim/board.ts';
@@ -74,6 +87,9 @@ if (!maybeCtx) {
 }
 const ctx = maybeCtx;
 
+const ONLINE_PORT = 8787;
+const RETRY_MS = 1500;
+const MAX_RETRIES = 20;
 const aiPrep = createAiPrep('normal');
 let game: GameState = createGame({ mode: 'ai', seed: SEED }, aiPrep);
 let started = false;
@@ -92,6 +108,11 @@ function acting(): Side {
   return game.active;
 }
 let selection: Selection | null = null;
+// Online play: the server owns the match, so `game` is a mirror of what it sent.
+let online: OnlineState | null = null;
+let net: NetClient | null = null;
+/** The fight just played (online), kept until the player leaves the result screen. */
+let resultFight: NonNullable<OnlineState['fight']> | null = null;
 let playback = createPlayback();
 let snapshot: UnitSnapshot[] = [];
 let animating: BattleState | null = null;
@@ -109,6 +130,10 @@ function say(message: string): void {
 
 const hud = createHud(hudRoot, {
   buy(slot) {
+    if (online) {
+      net?.send({ type: 'buy', slot });
+      return;
+    }
     const before = structuredClone(game.players[acting()].holdings);
     const result = buyCard(game, acting(), slot);
     const merges = detectMerges(before, game.players[acting()].holdings);
@@ -121,23 +146,46 @@ const hud = createHud(hudRoot, {
     refresh();
   },
   reroll() {
+    if (online) {
+      net?.send({ type: 'reroll' });
+      return;
+    }
     rerollShop(game, acting());
     refresh();
   },
   toggleLock() {
+    if (online) {
+      net?.send({ type: 'lock' });
+      return;
+    }
     lockShop(game, acting());
     refresh();
   },
   buyXp() {
+    if (online) {
+      net?.send({ type: 'buyXP' });
+      return;
+    }
     buyXpIntent(game, acting());
     refresh();
   },
   sell() {
+    if (online) {
+      if (selection) net?.send({ type: 'sell', pieceId: selection.id });
+      selection = null;
+      refresh();
+      return;
+    }
     if (selection) sellPiece(game, acting(), selection.id);
     selection = null;
     refresh();
   },
   ready() {
+    if (online) {
+      selection = null;
+      net?.send({ type: 'ready' });
+      return;
+    }
     if (!ready(game)) return;
     selection = null;
     say('');
@@ -152,7 +200,7 @@ const hud = createHud(hudRoot, {
     refresh();
   },
   tapBench(slot) {
-    applyTap(tapBenchSlot(game, acting(), selection, slot));
+    moveTo(selection, { kind: 'bench', slot });
   },
 });
 
@@ -162,14 +210,132 @@ function applyTap(result: TapResult): void {
   refresh();
 }
 
+/**
+ * Select or move a piece. Online, a move is applied to the local mirror at
+ * once and also sent as an intent; the server's state (also sent when it
+ * refuses) then replaces the mirror.
+ */
+function moveTo(source: Selection | null, target: DropTarget): void {
+  const holdings = game.players[acting()].holdings;
+  const before = online ? JSON.stringify(holdings) : '';
+  let result: TapResult;
+  if (source) result = applyDrop(game, acting(), source, target);
+  else if (target.kind === 'square') result = tapSquare(game, acting(), null, target.pos);
+  else result = tapBenchSlot(game, acting(), null, target.slot);
+  if (source && online && JSON.stringify(holdings) !== before) {
+    net?.send({
+      type: 'place',
+      pieceId: source.id,
+      to:
+        target.kind === 'square'
+          ? { kind: 'board', x: target.pos.x, y: target.pos.y }
+          : { kind: 'bench', slot: target.slot },
+    });
+  }
+  applyTap(result);
+}
+
 function refresh(): void {
   hud.update(game, selection?.id ?? null);
   overlays.show(
-    overlayView(game, { started, animationDone: animating === null, canContinue: hasSave }),
+    onlineOverlay(online) ??
+      overlayView(game, {
+        started: started || online !== null,
+        animationDone: animating === null,
+        canContinue: hasSave,
+      }),
   );
 }
 
+// ---------------------------------------------------------------------------
+// Online play
+// ---------------------------------------------------------------------------
+
+function serverUrl(): string {
+  const override = new URLSearchParams(window.location.search).get('server');
+  if (override) return override;
+  const scheme = window.location.protocol === 'https:' ? 'wss' : 'ws';
+  return `${scheme}://${window.location.hostname}:${String(ONLINE_PORT)}`;
+}
+
+/** Show the server's latest state, unless a fight or its result is still on screen. */
+function syncOnline(): void {
+  if (!online?.view || animating || resultFight) return;
+  const before = game.players[acting()].holdings;
+  const next = mirrorGame(online.view);
+  const merges = detectMerges(before, next.players[next.active].holdings);
+  logPanel.add(merges);
+  if (merges.length > 0) sound.play('merge');
+  game = next;
+  // Keep the player's selection while the piece is still theirs.
+  const { holdings } = next.players[next.active];
+  const owned = [...holdings.board, ...holdings.bench].some((p) => p?.id === selection?.id);
+  if (!owned) selection = null;
+}
+
+function onlineEvent(event: OnlineEvent): void {
+  if (!online) return;
+  online = onlineReduce(online, event);
+  if (event.type === 'fight' && online.fight) {
+    // The state that follows the fight is held back until the result is dismissed.
+    resultFight = online.fight;
+    online = { ...online, fight: null };
+    animating = battleFromFight(resultFight);
+    snapshot = snapshotUnits(animating);
+    playback = createPlayback();
+    resultShownAtMs = null;
+    loggedLines = 0;
+    cuedEvents = 0;
+    selection = null;
+  }
+  syncOnline();
+  say(connectionNote(online) ?? '');
+  refresh();
+}
+
+function leaveOnline(): void {
+  net?.close();
+  net = null;
+  online = null;
+  resultFight = null;
+  animating = null;
+  selection = null;
+  started = false;
+  game = createGame({ mode: 'ai', seed: SEED + game.round }, aiPrep);
+  logPanel.clear();
+  say('');
+  refresh();
+}
+
 const overlays = createOverlays(app, {
+  startOnline() {
+    online = initialOnlineState();
+    net = createNetClient({
+      url: serverUrl(),
+      createSocket: (url) => new WebSocket(url) as unknown as SocketLike,
+      onMessage: onlineEvent,
+      onStatus: (status) => {
+        onlineEvent({ type: 'status', status });
+      },
+      retryMs: RETRY_MS,
+      maxRetries: MAX_RETRIES,
+    });
+    refresh();
+  },
+  onlineCreate(name) {
+    net?.send({ type: 'create', name });
+  },
+  onlineJoin(name, code) {
+    if (code.trim() === '') {
+      onlineEvent({ type: 'error', error: 'no-such-room' });
+      return;
+    }
+    net?.send({ type: 'join', room: code.trim(), name });
+  },
+  onlineReady() {
+    net?.send({ type: 'ready' });
+  },
+  onlineLeave: leaveOnline,
   start(mode: GameMode) {
     game = createGame({ mode, seed: SEED + game.round }, aiPrep);
     started = true;
@@ -200,11 +366,21 @@ const overlays = createOverlays(app, {
     refresh();
   },
   nextRound() {
+    if (online) {
+      resultFight = null;
+      syncOnline();
+      refresh();
+      return;
+    }
     nextRound(game, aiPrep);
     persist();
     refresh();
   },
   newWar() {
+    if (online) {
+      leaveOnline();
+      return;
+    }
     started = false;
     game = createGame({ mode: 'ai', seed: SEED + game.round }, aiPrep);
     refresh();
@@ -290,6 +466,7 @@ function frame(nowMs: number): void {
       resultShownAtMs ??= nowMs;
       if (nowMs - resultShownAtMs > RESULT_HOLD_MS) {
         animating = null;
+        if (online && resultFight) game = withResult(game, resultFight.result);
         const line = resultLogLine(game);
         if (line) logPanel.add([line]);
         const cue = game.result ? roundCue(game.result.winner, 0) : null;
@@ -328,7 +505,7 @@ attachBoardInput(
   () => layout,
   (pos) => {
     if (animating || game.phase !== 'prep') return;
-    applyTap(tapSquare(game, acting(), selection, pos));
+    moveTo(selection, { kind: 'square', pos });
   },
 );
 
@@ -341,7 +518,7 @@ attachDrag({
   canvas,
   benchRoot: hudRoot,
   getLayout: () => layout,
-  enabled: () => started && animating === null && game.phase === 'prep',
+  enabled: () => (started || online !== null) && animating === null && game.phase === 'prep',
   sourceAtSquare(pos) {
     const piece = game.players[acting()].holdings.board.find((p) => p.x === pos.x && p.y === pos.y);
     return piece ? { id: piece.id, from: 'board' } : null;
@@ -364,7 +541,7 @@ attachDrag({
   },
   onDrop(source, target) {
     dropSquare = undefined;
-    applyTap(applyDrop(game, acting(), source, target));
+    moveTo(source, target);
   },
   onCancel() {
     dropSquare = undefined;

@@ -190,3 +190,13 @@ describe('strike generation', () => {
     expect(strikesFrom('B', 'g7')).not.toContain('k3');
   });
 });
+
+describe('move ordering', () => {
+  it('each side lists its own forward direction first, so ties favour neither', () => {
+    // Ivory rook on d4: first slide goes east; Ebony rook on m4: first slide goes west.
+    expect(movesFrom('R', 'd4', { side: 0 })[0]).toBe('e4');
+    expect(movesFrom('R', 'm4', { side: 1 })[0]).toBe('l4');
+    expect(movesFrom('N', 'd4', { side: 0 })[0]?.charCodeAt(0)).toBeGreaterThan('d'.charCodeAt(0));
+    expect(movesFrom('N', 'm4', { side: 1 })[0]?.charCodeAt(0)).toBeLessThan('m'.charCodeAt(0));
+  });
+});

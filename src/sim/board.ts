@@ -107,6 +107,15 @@ function add(pos: Pos, dir: Pos): Pos {
   return { x: pos.x + dir.x, y: pos.y + dir.y };
 }
 
+/**
+ * Ties between equally good moves are broken by generation order, so each side
+ * lists directions with its own forward direction first. Otherwise one side
+ * would systematically prefer moves toward its own wall.
+ */
+function forwardFirst(dirs: readonly Pos[], side: Side): readonly Pos[] {
+  return side === 0 ? dirs : dirs.map((d) => ({ x: -d.x, y: d.y }));
+}
+
 function slideMoves(from: Pos, dirs: readonly Pos[], occupied: Occupied): Pos[] {
   const moves: Pos[] = [];
   for (const dir of dirs) {
@@ -132,8 +141,10 @@ function pawnMoves(from: Pos, side: Side, occupied: Occupied): Pos[] {
     .filter((to) => walkable(from, to, occupied));
 }
 
-function knightMoves(from: Pos, occupied: Occupied): Pos[] {
-  return KNIGHT_JUMPS.map((jump) => add(from, jump)).filter((to) => inBounds(to) && !occupied(to));
+function knightMoves(from: Pos, side: Side, occupied: Occupied): Pos[] {
+  return forwardFirst(KNIGHT_JUMPS, side)
+    .map((jump) => add(from, jump))
+    .filter((to) => inBounds(to) && !occupied(to));
 }
 
 /** Every square a piece of `type` and `side` standing on `from` can move to. */
@@ -142,13 +153,13 @@ export function generateMoves(type: PieceType, side: Side, from: Pos, occupied: 
     case 'P':
       return pawnMoves(from, side, occupied);
     case 'N':
-      return knightMoves(from, occupied);
+      return knightMoves(from, side, occupied);
     case 'B':
-      return slideMoves(from, DIAGONAL_DIRS, occupied);
+      return slideMoves(from, forwardFirst(DIAGONAL_DIRS, side), occupied);
     case 'R':
-      return slideMoves(from, ORTHOGONAL_DIRS, occupied);
+      return slideMoves(from, forwardFirst(ORTHOGONAL_DIRS, side), occupied);
     case 'Q':
-      return slideMoves(from, ALL_DIRS, occupied);
+      return slideMoves(from, forwardFirst(ALL_DIRS, side), occupied);
   }
 }
 

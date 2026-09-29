@@ -711,3 +711,17 @@ body {
   mask: var(--icon) center / contain no-repeat;
   -webkit-mask: var(--icon) center / contain no-repeat;
 }
+
+.demo-tip {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 8px 12px;
+  text-align: center;
+  color: var(--brass);
+  border: 1px solid var(--brass);
+  border-radius: 6px;
+}
+
+.demo-tip[hidden] {
+  display: none;
+}

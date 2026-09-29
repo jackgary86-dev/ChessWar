@@ -6,6 +6,10 @@ An auto-battler played with real chess pieces. Two players each own an 8×8 boar
 
 Open `prototype/chess-war.html` in a browser. It is a single file with no build step. You can play against the AI, or with two people taking turns on the same screen.
 
+## Playable demo
+
+Add `?demo` to the page address (for example `http://localhost:5173/?demo`) for a short showcase: vs AI only, 5 rounds, hints through the first round (shop, placement, portals, merging), and an end screen that links to the full game. Demo matches are not saved.
+
 ## How a round works
 
 1. **Shop.** Spend gold on pieces, rerolls (2 gold) and XP (4 gold). Your level sets how many pieces you can field, up to 8.

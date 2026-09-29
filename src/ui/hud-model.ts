@@ -158,15 +158,13 @@ export function dockView(game: GameState, selectedPieceId: number | null): DockV
     };
   });
 
-  const bench = holdings.bench.map(
-    (piece, index): BenchSlotView => ({
-      index,
-      piece,
-      name: piece ? `${PIECES[piece.type].name} ${String(piece.stars)} star` : 'Empty bench slot',
-      glyph: piece ? PIECES[piece.type].glyph : '',
-      selected: piece !== null && piece.id === selectedPieceId,
-    }),
-  );
+  const bench = holdings.bench.map((piece, index): BenchSlotView => ({
+    index,
+    piece,
+    name: piece ? `${PIECES[piece.type].name} ${String(piece.stars)} star` : 'Empty bench slot',
+    glyph: piece ? PIECES[piece.type].glyph : '',
+    selected: piece !== null && piece.id === selectedPieceId,
+  }));
 
   const selected =
     selectedPieceId === null

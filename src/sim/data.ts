@@ -299,6 +299,99 @@ export const AI = Object.freeze({
   maxRerolls: 2,
 });
 
+export type AiDifficulty = 'easy' | 'normal' | 'hard';
+
+/** How the AI's play differs by difficulty. The rules it plays by never change. */
+export interface AiDifficultyDef {
+  /** Aim this many levels below the normal target level. */
+  readonly levelLag: number;
+  /** Fill the army up to level + this many pieces. */
+  readonly armyOverLevel: number;
+  /** Reroll up to this many times per prep (0 = never). */
+  readonly maxRerolls: number;
+  readonly rerollMinGold: number;
+  readonly rerollFromRound: number;
+  /** Place pieces in formation; otherwise fill squares in reading order. */
+  readonly useFormation: boolean;
+}
+
+export const AI_DIFFICULTY: Readonly<Record<AiDifficulty, AiDifficultyDef>> = Object.freeze({
+  easy: {
+    levelLag: 1,
+    armyOverLevel: 0,
+    maxRerolls: 0,
+    rerollMinGold: 16,
+    rerollFromRound: 5,
+    useFormation: false,
+  },
+  normal: {
+    levelLag: 0,
+    armyOverLevel: AI.armyOverLevel,
+    maxRerolls: AI.maxRerolls,
+    rerollMinGold: AI.rerollMinGold,
+    rerollFromRound: AI.rerollFromRound,
+    useFormation: true,
+  },
+  hard: {
+    levelLag: 0,
+    armyOverLevel: AI.armyOverLevel,
+    maxRerolls: 3,
+    rerollMinGold: 12,
+    rerollFromRound: 4,
+    useFormation: true,
+  },
+});
+
+/**
+ * AI formation: preferred squares per piece type as [depth, y] pairs, where
+ * depth 0 is the file next to the wall and grows toward the player's back
+ * edge. Pawns take the portal lanes (y 2 and 5) at the front, knights sit
+ * behind them, rooks and the queen in the middle, bishops at the back.
+ */
+export const AI_FORMATION: Readonly<Record<PieceType, readonly (readonly [number, number])[]>> =
+  Object.freeze({
+    P: [
+      [1, 2],
+      [1, 5],
+      [2, 1],
+      [2, 6],
+      [1, 3],
+      [1, 4],
+      [2, 2],
+      [2, 5],
+      [3, 0],
+      [3, 7],
+    ],
+    N: [
+      [2, 3],
+      [2, 4],
+      [3, 2],
+      [3, 5],
+      [2, 0],
+      [2, 7],
+    ],
+    R: [
+      [3, 3],
+      [3, 4],
+      [4, 2],
+      [4, 5],
+    ],
+    Q: [
+      [4, 3],
+      [4, 4],
+      [5, 2],
+      [5, 5],
+    ],
+    B: [
+      [5, 2],
+      [5, 5],
+      [5, 3],
+      [5, 4],
+      [6, 1],
+      [6, 6],
+    ],
+  });
+
 // ---------------------------------------------------------------------------
 // Derived values
 // ---------------------------------------------------------------------------

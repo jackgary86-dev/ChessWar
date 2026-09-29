@@ -16,7 +16,8 @@
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
     "sim": "tsx scripts/sim.ts",
-    "server": "tsx scripts/server.ts"
+    "server": "tsx scripts/server.ts",
+    "pieces": "tsx scripts/build-pieces.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

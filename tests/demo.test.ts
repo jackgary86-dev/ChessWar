@@ -173,7 +173,9 @@ describe('first-match hints in the full game', () => {
       removeItem: () => undefined,
     };
     expect(tipsDone(blocked)).toBe(false);
-    expect(() => markTipsDone(blocked)).not.toThrow();
+    expect(() => {
+      markTipsDone(blocked);
+    }).not.toThrow();
     expect(tipsDone(null)).toBe(false);
   });
 });

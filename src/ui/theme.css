@@ -487,3 +487,25 @@ body {
   margin: 6px 0 0;
   font-size: 13px;
 }
+
+.slot {
+  touch-action: none;
+}
+
+.slot.drop {
+  border-color: var(--heal);
+  box-shadow: 0 0 0 2px var(--heal);
+}
+
+.ghost {
+  position: fixed;
+  z-index: 20;
+  pointer-events: none;
+  transform: translate(-50%, -60%);
+  font-family: var(--f-piece);
+  font-size: 44px;
+  line-height: 1;
+  color: var(--ivory);
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.7);
+  opacity: 0.9;
+}

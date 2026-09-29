@@ -37,6 +37,8 @@ export interface Scene {
   readonly effects?: readonly Effect[];
   /** Square of the selected board piece, outlined in brass. */
   readonly selected?: Pos;
+  /** Square under a dragged piece, outlined in green. */
+  readonly dropSquare?: Pos;
 }
 
 export interface Theme {
@@ -245,12 +247,12 @@ function drawHighlights(
 function drawSelection(
   ctx: CanvasRenderingContext2D,
   layout: Layout,
-  theme: Theme,
   pos: Pos,
+  color: string,
 ): void {
   const at = layout.toScreen(pos);
   const width = Math.max(2, layout.cell * SELECTION_WIDTH);
-  ctx.strokeStyle = theme.brass;
+  ctx.strokeStyle = color;
   ctx.lineWidth = width;
   ctx.strokeRect(at.x + width / 2, at.y + width / 2, layout.cell - width, layout.cell - width);
 }
@@ -398,7 +400,8 @@ export function drawScene(
   drawPortals(ctx, layout, theme, timeMs, reducedMotion);
   drawNotation(ctx, layout, theme);
   if (scene.highlights) drawHighlights(ctx, layout, theme, scene.highlights);
-  if (scene.selected) drawSelection(ctx, layout, theme, scene.selected);
+  if (scene.selected) drawSelection(ctx, layout, scene.selected, theme.brass);
+  if (scene.dropSquare) drawSelection(ctx, layout, scene.dropSquare, theme.heal);
   for (const piece of scene.pieces) {
     drawPiece(ctx, layout, theme, piece, scene.showHp);
   }

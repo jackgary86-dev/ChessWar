@@ -25,6 +25,10 @@ export interface PieceDef {
   readonly atk: number;
   /** Acts once every `speed` ticks. */
   readonly speed: number;
+  /** How the piece moves, for the field manual. */
+  readonly movement: string;
+  /** Which squares it can strike, for the field manual. */
+  readonly strike: string;
   /** Maximum strike distance for sliding pieces. Undefined for fixed patterns. */
   readonly strikeRange?: number;
   readonly ability: AbilityDef;
@@ -61,6 +65,8 @@ export const PIECES: Readonly<Record<PieceType, PieceDef>> = Object.freeze({
     hp: 380,
     atk: 45,
     speed: 2,
+    movement: '1 square forward or diagonally forward',
+    strike: 'the 3 squares ahead',
     ability: {
       name: 'Shield Wall',
       description: 'Takes less damage while a friendly piece is orthogonally adjacent.',
@@ -75,6 +81,8 @@ export const PIECES: Readonly<Record<PieceType, PieceDef>> = Object.freeze({
     hp: 520,
     atk: 70,
     speed: 2,
+    movement: 'L-jump, leaps the wall anywhere',
+    strike: 'knight squares',
     ability: {
       name: 'Fork',
       description: 'Also hits other enemies on its knight squares.',
@@ -89,6 +97,8 @@ export const PIECES: Readonly<Record<PieceType, PieceDef>> = Object.freeze({
     hp: 440,
     atk: 58,
     speed: 2,
+    movement: 'diagonal slide, any distance',
+    strike: `diagonal, up to ${String(SLIDER_STRIKE_RANGE)} squares, line of sight`,
     strikeRange: SLIDER_STRIKE_RANGE,
     ability: {
       name: 'Blessing',
@@ -104,6 +114,8 @@ export const PIECES: Readonly<Record<PieceType, PieceDef>> = Object.freeze({
     hp: 780,
     atk: 72,
     speed: 3,
+    movement: 'orthogonal slide',
+    strike: `orthogonal, up to ${String(SLIDER_STRIKE_RANGE)} squares`,
     strikeRange: SLIDER_STRIKE_RANGE,
     ability: {
       name: 'Fortress',
@@ -119,6 +131,8 @@ export const PIECES: Readonly<Record<PieceType, PieceDef>> = Object.freeze({
     hp: 720,
     atk: 95,
     speed: 2,
+    movement: 'all 8 directions',
+    strike: `all 8 directions, up to ${String(SLIDER_STRIKE_RANGE)} squares`,
     strikeRange: SLIDER_STRIKE_RANGE,
     ability: {
       name: 'Pierce',

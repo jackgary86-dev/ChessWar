@@ -13,6 +13,10 @@ Open `prototype/chess-war.html` in a browser. It is a single file with no build 
 3. **Fight.** Both boards are revealed. Pieces move and strike automatically using chess movement, with HP and damage instead of instant captures.
 4. **Result.** The loser takes damage based on the winner's surviving pieces. The first player to reach 0 HP loses the war.
 
+## Demo
+
+Add `?demo` to the page address for a short slice to show people: vs AI only, 5 rounds, tips on the first round, and an end screen linking to the full game. It never touches a saved war.
+
 ## Rules at a glance
 
 - **Portals.** Pieces can only cross the wall through the glowing portal squares on ranks 6 and 3. Knights leap the wall anywhere.

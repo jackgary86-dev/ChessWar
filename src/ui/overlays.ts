@@ -94,17 +94,24 @@ function boxFor(view: OverlayView, actions: OverlayActions): HTMLElement {
         el('h2', 'wordmark', 'Chess War'),
         el('p', undefined, 'An auto-battler played with real chess pieces.'),
         ...(view.notice ? [el('p', 'muted', view.notice)] : []),
+        ...(view.demo
+          ? [el('p', 'muted', 'Demo: 5 rounds against the AI, with tips on your first round.')]
+          : []),
         button(
-          'Play vs AI',
+          view.demo ? 'Play the demo' : 'Play vs AI',
           () => {
             actions.start('ai');
           },
           true,
         ),
-        button('2 players on one screen', () => {
-          actions.start('local');
-        }),
-        button('Play online', actions.startOnline),
+        ...(view.demo
+          ? []
+          : [
+              button('2 players on one screen', () => {
+                actions.start('local');
+              }),
+              button('Play online', actions.startOnline),
+            ]),
       );
       if (view.canContinue) box.append(button('Continue saved war', actions.continueSaved));
       break;

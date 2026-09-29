@@ -711,3 +711,36 @@ body {
   mask: var(--icon) center / contain no-repeat;
   -webkit-mask: var(--icon) center / contain no-repeat;
 }
+
+.demo-hint {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 12px;
+  margin: 8px auto;
+  max-width: 720px;
+  padding: 10px 14px;
+  background: var(--panel);
+  border: 1px solid var(--brass);
+  border-radius: 6px;
+}
+
+.demo-hint[hidden] {
+  display: none;
+}
+
+.demo-hint p {
+  margin: 0;
+  flex: 1 1 320px;
+}
+
+.demo-hint button {
+  background: var(--panel-2);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 6px 12px;
+  font: inherit;
+  cursor: pointer;
+}

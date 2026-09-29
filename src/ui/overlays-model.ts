@@ -15,7 +15,13 @@ export type ResultTone = 'win' | 'lose' | 'draw';
 
 export type OverlayView =
   | OnlineOverlay
-  | { readonly kind: 'start'; readonly canContinue: boolean; readonly notice?: string }
+  | {
+      readonly kind: 'start';
+      readonly canContinue: boolean;
+      readonly notice?: string;
+      /** The demo start screen: vs AI only. */
+      readonly demo?: boolean;
+    }
   | {
       readonly kind: 'handoff';
       readonly round: number;
@@ -49,6 +55,8 @@ export interface OverlayContext {
   readonly canContinue?: boolean;
   /** A note for the start screen, e.g. that a damaged save was discarded. */
   readonly notice?: string;
+  /** Demo build: a vs-AI-only start screen, and `demoOver` swaps the end screen. */
+  readonly demo?: { readonly over: boolean; readonly outcome: ResultTone; readonly rounds: number };
 }
 
 function otherSide(side: Side): Side {
@@ -73,8 +81,19 @@ export function overlayView(game: GameState, context: OverlayContext): OverlayVi
   if (!context.started) {
     return {
       kind: 'start',
-      canContinue: context.canContinue === true,
+      canContinue: context.demo ? false : context.canContinue === true,
       ...(context.notice ? { notice: context.notice } : {}),
+      ...(context.demo ? { demo: true } : {}),
+    };
+  }
+
+  if (context.demo?.over && context.animationDone) {
+    return {
+      kind: 'over',
+      title: 'That was the demo',
+      subtitle: `You played ${plural(Math.min(game.round, context.demo.rounds), 'round')}. The full game runs until one commander falls, with more to buy, merge and learn.`,
+      button: 'Play the full game',
+      tone: context.demo.outcome,
     };
   }
 

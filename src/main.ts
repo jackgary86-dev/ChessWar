@@ -67,6 +67,7 @@ import type { Layout } from '@ui/layout.ts';
 import { drawScene, fitCanvas, prefersReducedMotion, readTheme } from '@ui/render.ts';
 import type { DrawPiece } from '@ui/render.ts';
 import { preloadArt } from '@ui/preload.ts';
+import { DEMO_ROUNDS, demoIsOver, demoOutcome, demoTip, fullGameUrl, isDemoUrl } from '@ui/demo.ts';
 import '@ui/theme.css';
 
 // This entry point wires the HUD and overlays to a match (vs AI or hot-seat) so the round
@@ -90,11 +91,14 @@ const speedBar = document.createElement('div');
 speedBar.className = 'controls';
 const toast = document.createElement('div');
 toast.className = 'toast';
+const demoHint = document.createElement('div');
+demoHint.className = 'demo-hint';
+demoHint.hidden = true;
 const hudRoot = document.createElement('div');
 hudRoot.className = 'hud';
 const infoRoot = document.createElement('div');
 infoRoot.className = 'hud';
-app.append(canvas, speedBar, toast, hudRoot, infoRoot);
+app.append(canvas, speedBar, toast, demoHint, hudRoot, infoRoot);
 const maybeCtx = canvas.getContext('2d');
 if (!maybeCtx) {
   throw new Error('Canvas 2D is not supported');
@@ -107,14 +111,19 @@ const MAX_RETRIES = 20;
 const aiPrep = createAiPrep('normal');
 let game: GameState = createGame({ mode: 'ai', seed: SEED }, aiPrep);
 let started = false;
+/** `?demo`: vs AI only, DEMO_ROUNDS rounds, tips in round 1, and no touching the player's saved war. */
+const demo = isDemoUrl(window.location.search);
+let demoTipIndex = 0;
+let demoResultDismissed = false;
 const storage = browserStorage();
 const firstRead = readSave(storage);
-let hasSave = firstRead.game !== null;
+let hasSave = !demo && firstRead.game !== null;
 /** Shown on the start screen when a damaged or outdated save was thrown away. */
 let saveNotice: string | undefined = firstRead.discarded ? DISCARDED_SAVE_MESSAGE : undefined;
 
 /** Save at the start of a prep phase, or drop the save once the war is over. */
 function persist(): void {
+  if (demo) return;
   if (game.phase === 'over') clearSave(storage);
   else saveGame(storage, game);
   hasSave = loadGame(storage) !== null;
@@ -287,8 +296,36 @@ function moveTo(source: Selection | null, target: DropTarget): void {
   applyTap(result);
 }
 
+/** The guided first round of the demo: one tip at a time with a Next button. */
+function renderDemoTip(): void {
+  const tip = demo && started ? demoTip(game, demoTipIndex) : null;
+  demoHint.hidden = tip === null;
+  if (!tip) {
+    demoHint.replaceChildren();
+    return;
+  }
+  const text = document.createElement('p');
+  text.textContent = tip.text;
+  const next = document.createElement('button');
+  next.type = 'button';
+  next.textContent = tip.last ? 'Got it' : 'Next tip';
+  next.addEventListener('click', () => {
+    demoTipIndex += 1;
+    renderDemoTip();
+  });
+  const skip = document.createElement('button');
+  skip.type = 'button';
+  skip.textContent = 'Skip tips';
+  skip.addEventListener('click', () => {
+    demoTipIndex = Number.POSITIVE_INFINITY;
+    renderDemoTip();
+  });
+  demoHint.replaceChildren(text, next, ...(tip.last ? [] : [skip]));
+}
+
 function refresh(): void {
   hud.update(game, selection?.id ?? null);
+  renderDemoTip();
   overlays.show(
     onlineOverlay(online) ??
       overlayView(game, {
@@ -296,6 +333,15 @@ function refresh(): void {
         animationDone: animating === null,
         canContinue: hasSave,
         ...(saveNotice ? { notice: saveNotice } : {}),
+        ...(demo
+          ? {
+              demo: {
+                over: demoIsOver(game, demoResultDismissed),
+                outcome: demoOutcome(game),
+                rounds: DEMO_ROUNDS,
+              },
+            }
+          : {}),
       }),
   );
 }
@@ -396,8 +442,10 @@ const overlays = createOverlays(app, {
   },
   onlineLeave: leaveOnline,
   start(mode: GameMode) {
-    game = createGame({ mode, seed: SEED + game.round }, aiPrep);
+    game = createGame({ mode: demo ? 'ai' : mode, seed: SEED + game.round }, aiPrep);
     started = true;
+    demoTipIndex = 0;
+    demoResultDismissed = false;
     saveNotice = undefined;
     logPanel.clear();
     selection = null;
@@ -435,11 +483,20 @@ const overlays = createOverlays(app, {
       refresh();
       return;
     }
+    if (demo && game.round >= DEMO_ROUNDS) {
+      demoResultDismissed = true;
+      refresh();
+      return;
+    }
     nextRound(game, aiPrep);
     persist();
     refresh();
   },
   newWar() {
+    if (demo) {
+      window.location.assign(fullGameUrl(window.location.href));
+      return;
+    }
     if (online) {
       leaveOnline();
       return;

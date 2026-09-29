@@ -44,7 +44,7 @@ npm run server    online 1v1 WebSocket server (PORT env var, default 8787): crea
 npm run sim       headless AI-vs-AI balance runner, e.g. npm run sim -- --games 500
 ```
 
-CI runs lint, test, build and a 1-game sim on every push and pull request.
+CI runs lint, test, build and a 1-game sim on every push and pull request, and uploads `dist/` as a build artifact named `chess-war-dist-<commit sha>` (kept 14 days). Find it on the run page under Actions.
 
 ## Repository layout
 

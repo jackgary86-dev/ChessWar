@@ -30,6 +30,8 @@ import { createHud } from '@ui/hud.ts';
 import { createFieldManual, createLogPanel } from '@ui/log.ts';
 import { battleLog, detectMerges, resultLogLine } from '@ui/log-model.ts';
 import { createOverlays } from '@ui/overlays.ts';
+import { createSound } from '@ui/sound.ts';
+import { cuesForEvents, roundCue } from '@ui/sound-model.ts';
 import { browserStorage, clearSave, loadGame, saveGame } from '@ui/storage.ts';
 import { overlayView, visiblePrepSides } from '@ui/overlays-model.ts';
 import { applyDrop, attachDrag } from '@ui/drag.ts';
@@ -95,6 +97,8 @@ let snapshot: UnitSnapshot[] = [];
 let animating: BattleState | null = null;
 let resultShownAtMs: number | null = null;
 let loggedLines = 0;
+let cuedEvents = 0;
+const sound = createSound(storage);
 let dropSquare: Pos | undefined;
 const logPanel = createLogPanel(infoRoot);
 createFieldManual(infoRoot);
@@ -107,7 +111,10 @@ const hud = createHud(hudRoot, {
   buy(slot) {
     const before = structuredClone(game.players[acting()].holdings);
     const result = buyCard(game, acting(), slot);
-    logPanel.add(detectMerges(before, game.players[acting()].holdings));
+    const merges = detectMerges(before, game.players[acting()].holdings);
+    logPanel.add(merges);
+    if (merges.length > 0) sound.play('merge');
+    else if (result === 'ok') sound.play('buy');
     if (result === 'bench-full') say('Bench is full. Sell or place a piece first.');
     else if (result === 'gold') say('Not enough gold.');
     else say('');
@@ -140,6 +147,7 @@ const hud = createHud(hudRoot, {
       playback = createPlayback();
       resultShownAtMs = null;
       loggedLines = 0;
+      cuedEvents = 0;
     }
     refresh();
   },
@@ -217,9 +225,22 @@ skipButton.addEventListener('click', () => {
   if (!animating) return;
   skipCombat(game);
   skipPlayback(playback, animating);
+  cuedEvents = animating.events.length;
   refresh();
 });
 speedBar.append(skipButton);
+
+const muteButton = document.createElement('button');
+function showMute(): void {
+  muteButton.textContent = sound.isMuted() ? 'Sound off' : 'Sound on';
+  muteButton.setAttribute('aria-pressed', String(sound.isMuted()));
+}
+muteButton.addEventListener('click', () => {
+  sound.setMuted(!sound.isMuted());
+  showMute();
+});
+showMute();
+speedBar.append(muteButton);
 
 /** Pieces on the boards that may be seen during prep (the AI's stays fogged). */
 function prepPieces(): DrawPiece[] {
@@ -262,12 +283,17 @@ function frame(nowMs: number): void {
     const due = lines.slice(loggedLines).filter((l) => l.tick - 1 < playback.time);
     logPanel.add(due);
     loggedLines += due.length;
+    const cued = cuesForEvents(battle.events, cuedEvents, playback.time);
+    cuedEvents = cued.next;
+    for (const cue of cued.cues) sound.play(cue);
     if (playbackDone(playback, battle)) {
       resultShownAtMs ??= nowMs;
       if (nowMs - resultShownAtMs > RESULT_HOLD_MS) {
         animating = null;
         const line = resultLogLine(game);
         if (line) logPanel.add([line]);
+        const cue = game.result ? roundCue(game.result.winner, 0) : null;
+        if (cue) sound.play(cue);
         refresh();
       }
     }

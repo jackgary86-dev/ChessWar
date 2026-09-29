@@ -74,3 +74,23 @@ export function clearSave(storage: StorageLike | null): void {
     // Nothing to do: the game plays on without a save.
   }
 }
+
+export const TIPS_KEY = 'chesswar.tips-done';
+
+/** True once the player has finished a first match with the hints on. */
+export function tipsDone(storage: StorageLike | null): boolean {
+  try {
+    return storage?.getItem(TIPS_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+
+/** Remember that the first-match hints need not appear again. */
+export function markTipsDone(storage: StorageLike | null): void {
+  try {
+    storage?.setItem(TIPS_KEY, '1');
+  } catch {
+    // Nothing to do: the hints simply appear again next time.
+  }
+}

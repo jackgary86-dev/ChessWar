@@ -8,6 +8,7 @@
 import { FIGHT_DAMAGE } from '@sim/data.ts';
 import type { GameState } from '@sim/game.ts';
 import type { Side } from '@sim/types.ts';
+import { DEMO_ROUNDS } from './demo-model.ts';
 import type { OnlineOverlay } from './online-model.ts';
 
 /** How a result screen should feel to the person looking at it. */
@@ -15,7 +16,19 @@ export type ResultTone = 'win' | 'lose' | 'draw';
 
 export type OverlayView =
   | OnlineOverlay
-  | { readonly kind: 'start'; readonly canContinue: boolean; readonly notice?: string }
+  | {
+      readonly kind: 'start';
+      readonly canContinue: boolean;
+      readonly notice?: string;
+      /** The demo start screen offers only the vs-AI slice. */
+      readonly demo?: boolean;
+    }
+  | {
+      readonly kind: 'demo-end';
+      readonly title: string;
+      readonly subtitle: string;
+      readonly tone: ResultTone;
+    }
   | {
       readonly kind: 'handoff';
       readonly round: number;
@@ -49,6 +62,10 @@ export interface OverlayContext {
   readonly canContinue?: boolean;
   /** A note for the start screen, e.g. that a damaged save was discarded. */
   readonly notice?: string;
+  /** The page was opened with `?demo`. */
+  readonly demo?: boolean;
+  /** Demo only: the player has dismissed the last result. */
+  readonly demoDone?: boolean;
 }
 
 function otherSide(side: Side): Side {
@@ -73,8 +90,24 @@ export function overlayView(game: GameState, context: OverlayContext): OverlayVi
   if (!context.started) {
     return {
       kind: 'start',
-      canContinue: context.canContinue === true,
+      canContinue: context.canContinue === true && context.demo !== true,
+      ...(context.demo ? { demo: true } : {}),
       ...(context.notice ? { notice: context.notice } : {}),
+    };
+  }
+
+  if (context.demo && (context.demoDone || game.phase === 'over')) {
+    const winner = game.gameWinner === null ? null : game.players[game.gameWinner].name;
+    const fell = game.phase === 'over';
+    return {
+      kind: 'demo-end',
+      title: fell
+        ? winner === null
+          ? 'Mutual destruction'
+          : `War won by ${winner}`
+        : 'Demo complete',
+      subtitle: `${plural(fell ? game.round : DEMO_ROUNDS, 'round')} played. The full game runs until a commander falls, and adds 2 player and online modes.`,
+      tone: fell ? toneOf(game, game.gameWinner) : 'win',
     };
   }
 
@@ -121,7 +154,7 @@ export function overlayView(game: GameState, context: OverlayContext): OverlayVi
       title,
       subtitle: `Round ${String(result.round)}`,
       lines,
-      button: 'Next round',
+      button: context.demo && game.round >= DEMO_ROUNDS ? 'Finish demo' : 'Next round',
       tone: toneOf(game, result.winner),
     };
   }

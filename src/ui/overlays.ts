@@ -20,6 +20,10 @@ export interface OverlayActions {
   confirmHandoff: () => void;
   nextRound: () => void;
   newWar: () => void;
+  /** Demo: leave the demo for the full game. */
+  playFull: () => void;
+  /** Demo: start the demo again. */
+  replayDemo: () => void;
 }
 
 export interface Overlays {
@@ -94,19 +98,33 @@ function boxFor(view: OverlayView, actions: OverlayActions): HTMLElement {
         el('h2', 'wordmark', 'Chess War'),
         el('p', undefined, 'An auto-battler played with real chess pieces.'),
         ...(view.notice ? [el('p', 'muted', view.notice)] : []),
+        ...(view.demo ? [el('p', 'muted', 'Demo: five rounds against the AI, with hints.')] : []),
         button(
-          'Play vs AI',
+          view.demo ? 'Play the demo' : 'Play vs AI',
           () => {
             actions.start('ai');
           },
           true,
         ),
-        button('2 players on one screen', () => {
-          actions.start('local');
-        }),
-        button('Play online', actions.startOnline),
+        ...(view.demo
+          ? [button('Play the full game', actions.playFull)]
+          : [
+              button('2 players on one screen', () => {
+                actions.start('local');
+              }),
+              button('Play online', actions.startOnline),
+            ]),
       );
       if (view.canContinue) box.append(button('Continue saved war', actions.continueSaved));
+      break;
+    case 'demo-end':
+      box.classList.add('outcome', 'final', `tone-${view.tone}`);
+      box.append(
+        el('h2', undefined, view.title),
+        el('p', undefined, view.subtitle),
+        button('Play the full game', actions.playFull, true),
+        button('Replay the demo', actions.replayDemo),
+      );
       break;
     case 'online-menu':
       box.append(...onlineMenu(view.error, actions));

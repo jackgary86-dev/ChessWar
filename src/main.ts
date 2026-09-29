@@ -43,6 +43,7 @@ import {
   readSave,
   saveGame,
 } from '@ui/storage.ts';
+import { demoFinished, demoTip, fullGameHref, isDemo, mergeNudge } from '@ui/demo-model.ts';
 import { overlayView, visiblePrepSides } from '@ui/overlays-model.ts';
 import { applyDrop, attachDrag } from '@ui/drag.ts';
 import type { DropTarget } from '@ui/drag.ts';
@@ -100,12 +101,20 @@ const hudRoot = document.createElement('div');
 hudRoot.className = 'hud';
 const infoRoot = document.createElement('div');
 infoRoot.className = 'hud';
-app.append(canvas, speedBar, toast, hudRoot, infoRoot);
+const tipBox = document.createElement('div');
+tipBox.className = 'demo-tip';
+tipBox.setAttribute('role', 'status');
+tipBox.hidden = true;
+app.append(canvas, speedBar, toast, tipBox, hudRoot, infoRoot);
 const maybeCtx = canvas.getContext('2d');
 if (!maybeCtx) {
   throw new Error('Canvas 2D is not supported');
 }
 const ctx = maybeCtx;
+
+const demo = isDemo(window.location.search);
+/** Demo: the last result has been dismissed. */
+let demoDone = false;
 
 const ONLINE_PORT = 8787;
 const RETRY_MS = 1500;
@@ -121,6 +130,7 @@ let saveNotice: string | undefined = firstRead.discarded ? DISCARDED_SAVE_MESSAG
 
 /** Save at the start of a prep phase, or drop the save once the war is over. */
 function persist(): void {
+  if (demo) return;
   if (game.phase === 'over') clearSave(storage);
   else saveGame(storage, game);
   hasSave = loadGame(storage) !== null;
@@ -294,14 +304,23 @@ function moveTo(source: Selection | null, target: DropTarget): void {
   applyTap(result);
 }
 
+function showTip(): void {
+  const tip = demo && started && animating === null ? demoTip(game) : null;
+  const nudge = tip ? mergeNudge(game) : null;
+  tipBox.hidden = tip === null;
+  tipBox.textContent = tip ? (nudge ? `${tip.text} ${nudge}` : tip.text) : '';
+}
+
 function refresh(): void {
   hud.update(game, selection?.id ?? null);
+  showTip();
   overlays.show(
     onlineOverlay(online) ??
       overlayView(game, {
         started: started || online !== null,
         animationDone: animating === null,
         canContinue: hasSave,
+        ...(demo ? { demo, demoDone } : {}),
         ...(saveNotice ? { notice: saveNotice } : {}),
       }),
   );
@@ -403,8 +422,9 @@ const overlays = createOverlays(app, {
   },
   onlineLeave: leaveOnline,
   start(mode: GameMode) {
-    game = createGame({ mode, seed: SEED + game.round }, aiPrep);
+    game = createGame({ mode: demo ? 'ai' : mode, seed: SEED + game.round }, aiPrep);
     started = true;
+    demoDone = false;
     saveNotice = undefined;
     logPanel.clear();
     selection = null;
@@ -442,8 +462,22 @@ const overlays = createOverlays(app, {
       refresh();
       return;
     }
+    if (demo && demoFinished(game)) {
+      demoDone = true;
+      refresh();
+      return;
+    }
     nextRound(game, aiPrep);
     persist();
+    refresh();
+  },
+  playFull() {
+    window.location.assign(fullGameHref(window.location.href));
+  },
+  replayDemo() {
+    demoDone = false;
+    started = false;
+    game = createGame({ mode: 'ai', seed: SEED + game.round }, aiPrep);
     refresh();
   },
   newWar() {

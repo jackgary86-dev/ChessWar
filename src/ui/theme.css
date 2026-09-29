@@ -712,6 +712,7 @@ body {
   -webkit-mask: var(--icon) center / contain no-repeat;
 }
 
+<<<<<<< HEAD
 /* Every control shows where keyboard focus is; the cards add their own inset ring above. */
 button:focus-visible,
 input:focus-visible,
@@ -719,4 +720,18 @@ select:focus-visible,
 canvas.battlefield:focus-visible {
   outline: 2px solid var(--brass);
   outline-offset: 2px;
+=======
+.demo-tip {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 8px 12px;
+  text-align: center;
+  color: var(--brass);
+  border: 1px solid var(--brass);
+  border-radius: 6px;
+}
+
+.demo-tip[hidden] {
+  display: none;
+>>>>>>> e2f4ccad1c9f6a82945d98dba8fbe38d0b7d7cb7
 }

@@ -402,6 +402,16 @@ body {
   .scores .vs {
     display: none;
   }
+
+  /* Narrow cards: reserve a footer strip so the cost badge and pips sit below the name
+     instead of on top of it. */
+  .card {
+    padding-bottom: 30px;
+  }
+
+  .card .n {
+    font-size: 12px;
+  }
 }
 
 .slot .g {

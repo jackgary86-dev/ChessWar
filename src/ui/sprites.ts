@@ -8,28 +8,11 @@
  * `npm run pieces`.
  */
 import type { PieceType, Side } from '@sim/types.ts';
-import bishopEbony from '../../assets/pieces/B-ebony.svg?url';
-import bishopIvory from '../../assets/pieces/B-ivory.svg?url';
-import knightEbony from '../../assets/pieces/N-ebony.svg?url';
-import knightIvory from '../../assets/pieces/N-ivory.svg?url';
-import pawnEbony from '../../assets/pieces/P-ebony.svg?url';
-import pawnIvory from '../../assets/pieces/P-ivory.svg?url';
-import queenEbony from '../../assets/pieces/Q-ebony.svg?url';
-import queenIvory from '../../assets/pieces/Q-ivory.svg?url';
-import rookEbony from '../../assets/pieces/R-ebony.svg?url';
-import rookIvory from '../../assets/pieces/R-ivory.svg?url';
+import { assetUrl, pieceAssetPath } from './assets.ts';
 
-/** Side 0 is Ivory, side 1 is Ebony. */
-const URLS: Readonly<Record<PieceType, readonly [string, string]>> = {
-  P: [pawnIvory, pawnEbony],
-  N: [knightIvory, knightEbony],
-  B: [bishopIvory, bishopEbony],
-  R: [rookIvory, rookEbony],
-  Q: [queenIvory, queenEbony],
-};
-
-export function pieceSpriteUrl(type: PieceType, side: Side): string {
-  return URLS[type][side];
+/** Url of a piece sprite, or undefined if `assets/pieces/` has no file for it. */
+export function pieceSpriteUrl(type: PieceType, side: Side): string | undefined {
+  return assetUrl(pieceAssetPath(type, side));
 }
 
 const cache = new Map<string, HTMLImageElement>();
@@ -38,6 +21,7 @@ const cache = new Map<string, HTMLImageElement>();
 export function pieceSprite(type: PieceType, side: Side): HTMLImageElement | null {
   if (typeof Image === 'undefined') return null;
   const url = pieceSpriteUrl(type, side);
+  if (url === undefined) return null;
   let image = cache.get(url);
   if (!image) {
     image = new Image();

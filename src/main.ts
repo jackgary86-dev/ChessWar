@@ -59,6 +59,7 @@ import { computeLayout, shouldStack } from '@ui/layout.ts';
 import type { Layout } from '@ui/layout.ts';
 import { drawScene, fitCanvas, prefersReducedMotion, readTheme } from '@ui/render.ts';
 import type { DrawPiece } from '@ui/render.ts';
+import { preloadArt } from '@ui/preload.ts';
 import '@ui/theme.css';
 
 // This entry point wires the HUD and overlays to a match (vs AI or hot-seat) so the round
@@ -67,6 +68,9 @@ const app = document.querySelector<HTMLDivElement>('#app');
 if (!app) {
   throw new Error('Missing #app root element');
 }
+
+// Warm the art cache; the loading screen hides itself, and slow or failed art falls back to glyphs.
+void preloadArt();
 
 const SEED = Date.now() % 1_000_000;
 const PAGE_MARGIN_PX = 32;

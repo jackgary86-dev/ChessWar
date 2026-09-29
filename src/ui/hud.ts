@@ -8,6 +8,7 @@ import type { GameState } from '@sim/game.ts';
 import { dockView, scoreboardView } from './hud-model.ts';
 import type { DockView, PlayerCardView } from './hud-model.ts';
 import { cardClasses, tierLabel } from './card-art.ts';
+import { assetUrl, iconAssetPath } from './assets.ts';
 import { pieceSpriteUrl } from './sprites.ts';
 
 export interface HudActions {
@@ -47,8 +48,26 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
-function button(label: string, onClick: () => void, enabled: boolean): HTMLButtonElement {
-  const b = el('button', undefined, label);
+/** A decorative icon from `assets/icons`, or nothing if the file is missing. */
+function icon(name: string): HTMLElement | null {
+  const url = assetUrl(iconAssetPath(name));
+  if (url === undefined) return null;
+  const node = el('span', 'ico');
+  node.style.setProperty('--icon', `url("${url}")`);
+  node.setAttribute('aria-hidden', 'true');
+  return node;
+}
+
+function button(
+  label: string,
+  onClick: () => void,
+  enabled: boolean,
+  iconName?: string,
+): HTMLButtonElement {
+  const b = el('button');
+  const glyph = iconName === undefined ? null : icon(iconName);
+  if (glyph) b.append(glyph);
+  b.append(label);
   b.type = 'button';
   b.disabled = !enabled;
   b.addEventListener('click', onClick);
@@ -95,15 +114,20 @@ function shopRow(dock: DockView, actions: HudActions, boughtSlot: number | undef
     pips.title = `${String(card.pips)} of ${String(card.pipSlots)} copies owned toward a merge`;
     for (let i = 0; i < card.pipSlots; i++) pips.append(el('i', i < card.pips ? 'on' : undefined));
     const art = el('span', 'g');
-    const img = el('img');
-    img.src = pieceSpriteUrl(card.type, dock.side);
-    img.alt = '';
-    img.draggable = false;
-    // Fall back to the Unicode glyph if the sprite fails to load.
-    img.addEventListener('error', () => {
+    const spriteUrl = pieceSpriteUrl(card.type, dock.side);
+    if (spriteUrl === undefined) {
       art.textContent = `${card.glyph}${VS_TEXT}`;
-    });
-    art.append(img);
+    } else {
+      const img = el('img');
+      img.src = spriteUrl;
+      img.alt = '';
+      img.draggable = false;
+      // Fall back to the Unicode glyph if the sprite fails to load.
+      img.addEventListener('error', () => {
+        art.textContent = `${card.glyph}${VS_TEXT}`;
+      });
+      art.append(img);
+    }
     b.append(
       el('span', 'tier', tierLabel(card.tier)),
       el('span', 'cost', String(card.cost)),
@@ -155,15 +179,16 @@ function actionRow(dock: DockView, actions: HudActions): HTMLElement {
     dock.lock.locked ? 'Shop locked' : 'Lock shop',
     actions.toggleLock,
     dock.lock.enabled,
+    'lock',
   );
   lock.classList.toggle('on', dock.lock.locked);
   const fight = button(dock.ready.label, actions.ready, dock.ready.enabled);
   fight.classList.add('primary');
   row.append(
-    button(`Reroll ${String(dock.reroll.cost)}g`, actions.reroll, dock.reroll.enabled),
+    button(`Reroll ${String(dock.reroll.cost)}g`, actions.reroll, dock.reroll.enabled, 'reroll'),
     lock,
-    button(xpLabel, actions.buyXp, dock.buyXp.enabled),
-    button(sellLabel, actions.sell, dock.sell.enabled),
+    button(xpLabel, actions.buyXp, dock.buyXp.enabled, 'xp'),
+    button(sellLabel, actions.sell, dock.sell.enabled, 'sell'),
     fight,
   );
   return row;

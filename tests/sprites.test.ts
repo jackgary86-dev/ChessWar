@@ -47,9 +47,10 @@ describe('piece sprites', () => {
   it('maps every piece and side to its own url', () => {
     const urls = new Set<string>();
     for (const type of PIECE_ORDER) {
-      for (const side of SIDE_NAMES) urls.add(pieceSpriteUrl(type, side));
+      for (const side of SIDE_NAMES) urls.add(pieceSpriteUrl(type, side) ?? '');
     }
     expect(urls.size).toBe(PIECE_ORDER.length * SIDE_NAMES.length);
+    expect(urls.has('')).toBe(false);
   });
 
   it('returns null where images are unavailable so the glyph is used', () => {

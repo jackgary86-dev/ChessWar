@@ -9,6 +9,7 @@
  *   types.ts, data.ts, rng.ts, board.ts, battle.ts,
  *   economy.ts, shop.ts, ai.ts, game.ts
  */
+export * from './ai.ts';
 export * from './battle.ts';
 export * from './board.ts';
 export * from './economy.ts';

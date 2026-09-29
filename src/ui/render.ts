@@ -12,6 +12,7 @@ import type { PieceType, Side, StarLevel } from '@sim/types.ts';
 import type { Effect } from './animation.ts';
 import type { Layout } from './layout.ts';
 import { pieceSprite } from './sprites.ts';
+import { pipOffsets, starStyle } from './stars.ts';
 
 export interface DrawPiece {
   readonly type: PieceType;
@@ -100,7 +101,6 @@ export const PIECE_GLYPH: Readonly<Record<PieceType, string>> = Object.freeze({
   Q: `♛${TEXT_VS}`,
 });
 
-const STAR = '★';
 const FILES = 'abcdefghijklmnop';
 
 // Drawing proportions, as fractions of one square.
@@ -112,8 +112,15 @@ const SPRITE_TOP = 0.08;
 const OUTLINE_WIDTH = 0.05;
 const SHADOW_BLUR = 0.12;
 const SHADOW_OFFSET = 0.05;
-const STAR_SIZE = 0.2;
 const STAR_Y = 0.88;
+// Star trim, as fractions of one square: the ring hugs the plinth (y 54/64 of the sprite).
+const RING_Y = SPRITE_TOP + SPRITE_SIZE * (54 / 64);
+const RING_RX = SPRITE_SIZE * (22 / 64);
+const RING_RY = SPRITE_SIZE * (5.5 / 64);
+const STAR_RING_WIDTH = 0.035;
+const GLOW_BLUR = 0.3;
+const PIP_SPACING = 0.15;
+const PIP_RADIUS = 0.05;
 const HP_BAR_HEIGHT = 0.09;
 const HP_BAR_WIDTH = 0.7;
 const HP_BAR_Y = 0.04;
@@ -289,6 +296,27 @@ function drawPiece(
   const cx = at.x + cell / 2;
   ctx.globalAlpha = piece.alpha ?? 1;
 
+  const style = starStyle(piece.stars);
+  if (style.ring) {
+    // Ring first, so the piece stands inside it. 3★ also glows.
+    ctx.save();
+    const ringWidth = Math.max(1.5, cell * STAR_RING_WIDTH);
+    ctx.beginPath();
+    ctx.ellipse(cx, at.y + cell * RING_Y, cell * RING_RX, cell * RING_RY, 0, 0, Math.PI * 2);
+    // A dark under-stroke keeps the silver ring readable on the light squares.
+    ctx.shadowColor = 'transparent';
+    ctx.strokeStyle = theme.ebony;
+    ctx.lineWidth = ringWidth + 2;
+    ctx.stroke();
+    if (style.glow) {
+      ctx.shadowColor = style.glow;
+      ctx.shadowBlur = cell * GLOW_BLUR;
+    }
+    ctx.strokeStyle = style.ring;
+    ctx.lineWidth = ringWidth;
+    ctx.stroke();
+    ctx.restore();
+  }
   const sprite = pieceSprite(piece.type, piece.side);
   ctx.shadowColor = SHADOW_COLOR;
   ctx.shadowBlur = cell * SHADOW_BLUR;
@@ -312,9 +340,16 @@ function drawPiece(
     ctx.fillText(PIECE_GLYPH[piece.type], cx, glyphY);
   }
 
-  ctx.font = `${String(Math.round(cell * STAR_SIZE))}px ${theme.pieceFont}`;
-  ctx.fillStyle = theme.brass;
-  ctx.fillText(STAR.repeat(piece.stars), cx, at.y + cell * STAR_Y);
+  // Star pips: filled dots, one per star, drawn as shapes so they stay crisp at small sizes.
+  ctx.fillStyle = style.pip;
+  ctx.strokeStyle = theme.ebony;
+  ctx.lineWidth = 1;
+  for (const dx of pipOffsets(style.pips, cell * PIP_SPACING)) {
+    ctx.beginPath();
+    ctx.arc(cx + dx, at.y + cell * STAR_Y, Math.max(1.5, cell * PIP_RADIUS), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  }
 
   if (showHp && piece.hp !== undefined && piece.maxHp !== undefined && piece.maxHp > 0) {
     const ratio = Math.max(0, Math.min(1, piece.hp / piece.maxHp));

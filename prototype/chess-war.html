@@ -1,4 +1,6 @@
 <!doctype html>
+<!-- Chess War prototype. Rules version: 1.0 (same numbers as src/sim/data.ts; tests/prototype-sync.test.ts fails when they drift).
+     When a rule or balance number changes in src/sim/data.ts, change it here too and bump this version. -->
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -136,7 +138,7 @@ h1 span{color:var(--brass)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
-<body>
+<body data-rules-version="1.0">
 
 <div class="app">
   <div class="main">

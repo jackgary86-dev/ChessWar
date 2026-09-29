@@ -39,6 +39,7 @@ npm run dev       start the Vite dev server
 npm test          run the Vitest suite
 npm run lint      ESLint + Prettier check
 npm run build     type-check and build static files into dist/
+npm run server    online 1v1 WebSocket server (PORT env var, default 8787)
 npm run sim       headless AI-vs-AI balance runner, e.g. npm run sim -- --games 500
 ```
 

@@ -15,6 +15,18 @@ import { pieceSprite } from './sprites.ts';
 import { drawFrame, drawTiles, drawWall } from './board-art.ts';
 import type { BoardPalette } from './board-art.ts';
 import { drawBridgeSpan, drawBurst, drawPortalSquare } from './portal-art.ts';
+import {
+  PIERCE_WIDTH_SCALE,
+  drawAbility,
+  drawFlash,
+  drawImpact,
+  drawShatter,
+  floatScale,
+  floatStyle,
+  jabReach,
+  strandOffsets,
+  strikeStyle,
+} from './vfx.ts';
 import { pipOffsets, starStyle } from './stars.ts';
 
 export interface DrawPiece {
@@ -350,11 +362,7 @@ function drawPiece(
   ctx.globalAlpha = 1;
 }
 
-const LINE_WIDTH = 0.09;
 const LINE_OUTLINE_EXTRA = 0.07;
-const FLOAT_RISE = 0.7;
-const FLOAT_SIZE = 0.34;
-const FLOAT_OUTLINE = 0.08;
 const RING_START = 0.25;
 const RING_GROWTH = 0.6;
 const RING_WIDTH = 0.06;
@@ -367,6 +375,40 @@ function centerOf(layout: Layout, pos: Pos): { x: number; y: number } {
 function toneColor(theme: Theme, tone: Side | 'heal'): string {
   if (tone === 'heal') return theme.heal;
   return tone === 0 ? theme.ivory : theme.ebony;
+}
+
+type LineEffect = Extract<Effect, { kind: 'line' }>;
+
+/** A strike or heal line, weighted by the striking piece and how it struck. */
+function drawLine(
+  ctx: CanvasRenderingContext2D,
+  layout: Layout,
+  theme: Theme,
+  effect: LineEffect,
+): void {
+  const { cell } = layout;
+  const style = strikeStyle(effect.piece);
+  const a = centerOf(layout, effect.from);
+  const full = centerOf(layout, effect.to);
+  const reach = style.shape === 'jab' && effect.via === 'strike' ? jabReach(effect.progress) : 1;
+  const b = { x: a.x + (full.x - a.x) * reach, y: a.y + (full.y - a.y) * reach };
+  const length = Math.hypot(b.x - a.x, b.y - a.y) || 1;
+  const nx = -(b.y - a.y) / length;
+  const ny = (b.x - a.x) / length;
+  const weight = effect.via === 'pierce' ? PIERCE_WIDTH_SCALE : 1;
+  const strands = effect.via === 'heal' ? [0] : strandOffsets(style.strands);
+  for (const offset of strands) {
+    ctx.beginPath();
+    ctx.moveTo(a.x + nx * offset * cell, a.y + ny * offset * cell);
+    ctx.lineTo(b.x + nx * offset * cell, b.y + ny * offset * cell);
+    // A contrasting under-stroke keeps an ebony line visible on dark squares.
+    ctx.strokeStyle = effect.tone === 1 ? theme.ivory : theme.ebony;
+    ctx.lineWidth = cell * (style.width * weight + LINE_OUTLINE_EXTRA);
+    ctx.stroke();
+    ctx.strokeStyle = toneColor(theme, effect.tone);
+    ctx.lineWidth = cell * style.width * weight;
+    ctx.stroke();
+  }
 }
 
 function drawEffects(
@@ -383,28 +425,40 @@ function drawEffects(
     const fade = 1 - effect.progress;
     ctx.globalAlpha = fade;
     if (effect.kind === 'line') {
-      const a = centerOf(layout, effect.from);
-      const b = centerOf(layout, effect.to);
-      ctx.beginPath();
-      ctx.moveTo(a.x, a.y);
-      ctx.lineTo(b.x, b.y);
-      // A contrasting under-stroke keeps an ebony line visible on dark squares.
-      ctx.strokeStyle = effect.tone === 1 ? theme.ivory : theme.ebony;
-      ctx.lineWidth = cell * (LINE_WIDTH + LINE_OUTLINE_EXTRA);
-      ctx.stroke();
-      ctx.strokeStyle = toneColor(theme, effect.tone);
-      ctx.lineWidth = cell * LINE_WIDTH;
-      ctx.stroke();
+      drawLine(ctx, layout, theme, effect);
     } else if (effect.kind === 'float') {
       const c = centerOf(layout, effect.pos);
-      const y = c.y - cell * FLOAT_RISE * effect.progress;
-      ctx.font = `700 ${String(Math.round(cell * FLOAT_SIZE))}px ${theme.pieceFont}`;
+      const style = floatStyle(effect.tone);
+      const y = c.y - cell * style.rise * effect.progress;
+      ctx.font = `700 ${String(Math.round(cell * style.size * floatScale(effect.progress)))}px ${theme.pieceFont}`;
       ctx.lineJoin = 'round';
-      ctx.lineWidth = cell * FLOAT_OUTLINE;
+      ctx.lineWidth = cell * style.outline;
       ctx.strokeStyle = theme.wall;
       ctx.strokeText(effect.text, c.x, y);
       ctx.fillStyle = effect.tone === 'damage' ? theme.crimson : theme.heal;
       ctx.fillText(effect.text, c.x, y);
+    } else if (effect.kind === 'impact') {
+      drawImpact(
+        ctx,
+        centerOf(layout, effect.pos),
+        cell,
+        toneColor(theme, effect.tone),
+        effect.progress,
+      );
+    } else if (effect.kind === 'flash') {
+      ctx.globalAlpha = 1;
+      drawFlash(ctx, centerOf(layout, effect.pos), cell, effect.progress);
+    } else if (effect.kind === 'shatter') {
+      ctx.globalAlpha = 1 - effect.progress;
+      drawShatter(
+        ctx,
+        centerOf(layout, effect.pos),
+        cell,
+        toneColor(theme, effect.tone),
+        effect.progress,
+      );
+    } else if (effect.kind === 'ability') {
+      drawAbility(ctx, effect.ability, centerOf(layout, effect.pos), cell, theme, effect.progress);
     } else if (effect.kind === 'burst') {
       drawBurst(ctx, centerOf(layout, effect.pos), cell, theme.portal, effect.progress);
     } else {

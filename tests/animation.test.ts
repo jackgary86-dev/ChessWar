@@ -66,7 +66,7 @@ describe('frameAt', () => {
     expect(late).toMatchObject({ x: to.x, y: to.y, lift: 0 });
   });
 
-  it('draws a strike line in the attacker color with a floating damage number', () => {
+  it('draws a strike impact in the attacker color with a floating damage number', () => {
     const strike: BattleEvent = {
       kind: 'strike',
       tick: 1,
@@ -80,7 +80,7 @@ describe('frameAt', () => {
     const late = frameAt(snapshot, [strike], MID, false);
     expect(early.pieces[2]?.hp).toBe(HP);
     expect(late.pieces[2]?.hp).toBe(58);
-    expect(late.effects).toContainEqual(expect.objectContaining({ kind: 'line', tone: 0 }));
+    expect(late.effects).toContainEqual(expect.objectContaining({ kind: 'impact', tone: 0 }));
     expect(late.effects).toContainEqual(
       expect.objectContaining({ kind: 'float', text: '-42', tone: 'damage' }),
     );

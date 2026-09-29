@@ -70,18 +70,19 @@ describe('portal burst effect in the animation', () => {
   it('bursts at both ends of a portal crossing, then stops', () => {
     const during = frameAt(snapshot, events, 0.5, false);
     const bursts = during.effects.filter((e) => e.kind === 'burst');
-    expect(bursts.map((b) => (b.kind === 'burst' ? b.pos : null))).toEqual([
-      { x: 7, y: 5 },
-      { x: 8, y: 5 },
+    expect(bursts).toEqual([
+      expect.objectContaining({ pos: { x: 7, y: 5 } }),
+      expect.objectContaining({ pos: { x: 8, y: 5 } }),
     ]);
+
     expect(frameAt(snapshot, events, 5, false).effects.filter((e) => e.kind === 'burst')).toEqual(
       [],
     );
   });
 
   it('shows a static burst with reduced motion', () => {
-    const [a, b] = [0.3, 0.7].map(
-      (t) => frameAt(snapshot, events, t, true).effects.filter((e) => e.kind === 'burst')[0],
+    const [a, b] = [0.3, 0.7].map((t) =>
+      frameAt(snapshot, events, t, true).effects.find((e) => e.kind === 'burst'),
     );
     expect(a).toEqual(b);
   });

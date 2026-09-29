@@ -68,6 +68,13 @@ export type Effect =
       readonly progress: number;
     }
   | {
+      /** Prep-phase merge burst on a board piece; `stars` is the level reached. */
+      readonly kind: 'merge';
+      readonly pos: Pos;
+      readonly stars: StarLevel;
+      readonly progress: number;
+    }
+  | {
       /** Shield Wall / Fortress on the struck piece, Blessing on the healed one. */
       readonly kind: 'ability';
       readonly ability: AbilityVfx;

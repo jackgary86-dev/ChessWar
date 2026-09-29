@@ -194,6 +194,27 @@ export function blessingMotes(progress: number): { dx: number; dy: number; size:
   });
 }
 
+const MERGE_RING_START = 0.2;
+const MERGE_RING_GROWTH = 0.5;
+const MERGE_RISE = 0.7;
+const MERGE_SPREAD = 0.3;
+
+/** Merge burst: a growing ring and one rising star per star level reached. */
+export function mergeBurst(
+  progress: number,
+  stars: number,
+): { ringRadius: number; sparks: { dx: number; dy: number; size: number }[] } {
+  const first = (-(stars - 1) * MERGE_SPREAD) / 2;
+  return {
+    ringRadius: MERGE_RING_START + MERGE_RING_GROWTH * progress,
+    sparks: Array.from({ length: stars }, (_, i) => ({
+      dx: first + i * MERGE_SPREAD,
+      dy: -MERGE_RISE * progress,
+      size: 0.11 * (1 - progress * HALF),
+    })),
+  };
+}
+
 /** Fork: the branch line to a second target starts a beat after the first. */
 export const FORK_DELAY = 0.15;
 
@@ -318,6 +339,40 @@ export function drawAbility(
       );
       ctx.fill();
     }
+  }
+  ctx.restore();
+}
+
+export function drawMerge(
+  ctx: CanvasRenderingContext2D,
+  at: Point,
+  cell: number,
+  color: string,
+  stars: number,
+  progress: number,
+): void {
+  const burst = mergeBurst(progress, stars);
+  ctx.save();
+  ctx.globalAlpha = 1 - progress;
+  ctx.strokeStyle = color;
+  ctx.lineWidth = Math.max(1.5, cell * 0.07);
+  ctx.beginPath();
+  ctx.arc(at.x, at.y, burst.ringRadius * cell, 0, TWO_PI);
+  ctx.stroke();
+  ctx.fillStyle = color;
+  for (const spark of burst.sparks) {
+    // A four-point star.
+    const cx = at.x + spark.dx * cell;
+    const cy = at.y + spark.dy * cell;
+    const r = spark.size * cell;
+    ctx.beginPath();
+    for (let i = 0; i < 8; i++) {
+      const radius = i % 2 === 0 ? r : r * 0.4;
+      const a = (i * Math.PI) / 4 - Math.PI / 2;
+      ctx[i === 0 ? 'moveTo' : 'lineTo'](cx + Math.cos(a) * radius, cy + Math.sin(a) * radius);
+    }
+    ctx.closePath();
+    ctx.fill();
   }
   ctx.restore();
 }

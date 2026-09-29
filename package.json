@@ -17,7 +17,8 @@
     "format": "prettier --write .",
     "sim": "tsx scripts/sim.ts",
     "server": "tsx scripts/server.ts",
-    "pieces": "tsx scripts/build-pieces.ts"
+    "pieces": "tsx scripts/build-pieces.ts",
+    "icons": "tsx scripts/build-icons.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

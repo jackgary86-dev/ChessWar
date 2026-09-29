@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Chess War UI kit sheet</title>
+    <!-- Live component sheet: it links the game's own theme.css, so it cannot drift from the tokens. -->
+    <link rel="stylesheet" href="../../../src/ui/theme.css" />
+    <style>
+      body {
+        font-family:
+          system-ui,
+          -apple-system,
+          'Segoe UI',
+          sans-serif;
+        padding: 24px;
+        max-width: 960px;
+        margin: 0 auto;
+      }
+      h1,
+      h2 {
+        font-family: Georgia, 'Times New Roman', serif;
+        font-weight: 700;
+      }
+      h2 {
+        margin-top: 32px;
+        font-size: 20px;
+        border-bottom: 1px solid var(--line);
+        padding-bottom: 6px;
+      }
+      .row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        align-items: center;
+        margin: 12px 0;
+      }
+      .ico {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 2;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+        vertical-align: -4px;
+      }
+      .icon-cell {
+        display: grid;
+        justify-items: center;
+        gap: 6px;
+        width: 88px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .icon-cell .ico {
+        width: 32px;
+        height: 32px;
+        color: var(--ink);
+      }
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 6px;
+        padding: 12px;
+      }
+      .btn {
+        display: inline-flex;
+        gap: 6px;
+        align-items: center;
+        background: var(--panel-2);
+        color: var(--ink);
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        padding: 8px 12px;
+        font: inherit;
+        cursor: pointer;
+      }
+      .btn:hover:not(:disabled) {
+        border-color: var(--brass);
+      }
+      .btn.primary {
+        background: var(--brass);
+        color: var(--brass-ink);
+        border-color: var(--brass);
+      }
+      .btn.on {
+        border-color: var(--brass);
+        box-shadow: inset 0 0 0 1px var(--brass);
+      }
+      .btn:disabled {
+        cursor: default;
+        opacity: 0.5;
+      }
+      .num {
+        font-family: var(--f-mono);
+        font-variant-numeric: tabular-nums;
+      }
+      .bar {
+        height: 8px;
+        background: var(--panel-2);
+        border-radius: 4px;
+        overflow: hidden;
+        width: 160px;
+      }
+      .bar i {
+        display: block;
+        height: 100%;
+      }
+      .badge {
+        display: inline-block;
+        padding: 2px 8px;
+        border-radius: 10px;
+        background: var(--panel-2);
+        border: 1px solid var(--brass);
+        color: var(--brass);
+        font-size: 12px;
+      }
+      .tip {
+        position: relative;
+        display: inline-block;
+        background: var(--wall);
+        color: var(--ink);
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        padding: 6px 10px;
+        font-size: 12px;
+      }
+      .speed {
+        display: inline-flex;
+        border: 1px solid var(--line);
+        border-radius: 5px;
+        overflow: hidden;
+      }
+      .speed button {
+        background: var(--panel-2);
+        color: var(--ink);
+        border: 0;
+        border-right: 1px solid var(--line);
+        padding: 6px 12px;
+        font: inherit;
+        cursor: pointer;
+      }
+      .speed button:last-child {
+        border-right: 0;
+      }
+      .speed button.on {
+        background: var(--brass);
+        color: var(--brass-ink);
+      }
+    </style>
+  </head>
+  <body>
+    <svg
+      width="0"
+      height="0"
+      style="position: absolute"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    >
+      <symbol id="i-gold" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9" />
+        <circle cx="12" cy="12" r="5" />
+        <path d="M12 9.5v5" />
+      </symbol>
+      <symbol id="i-xp" viewBox="0 0 24 24">
+        <path d="M12 3l2.6 5.6 6.1.7-4.5 4.2 1.2 6L12 16.5 6.6 19.5l1.2-6L3.3 9.3l6.1-.7z" />
+      </symbol>
+      <symbol id="i-hp" viewBox="0 0 24 24">
+        <path
+          d="M12 20.5s-8-4.6-8-10.7A4.6 4.6 0 0 1 12 7a4.6 4.6 0 0 1 8 2.8c0 6.1-8 10.7-8 10.7z"
+        />
+      </symbol>
+      <symbol id="i-reroll" viewBox="0 0 24 24">
+        <path d="M20 11a8 8 0 0 0-14.5-4.2L4 8.5" />
+        <path d="M4 4v4.5h4.5" />
+        <path d="M4 13a8 8 0 0 0 14.5 4.2L20 15.5" />
+        <path d="M20 20v-4.5h-4.5" />
+      </symbol>
+      <symbol id="i-lock" viewBox="0 0 24 24">
+        <rect x="5" y="11" width="14" height="9" rx="2" />
+        <path d="M8 11V8a4 4 0 0 1 8 0v3" />
+      </symbol>
+      <symbol id="i-sell" viewBox="0 0 24 24">
+        <path d="M12 3v11" />
+        <path d="M8 10l4 4 4-4" />
+        <path d="M4 15v3a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-3" />
+      </symbol>
+      <symbol id="i-sound-on" viewBox="0 0 24 24">
+        <path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z" />
+        <path d="M15.5 9a4 4 0 0 1 0 6" />
+        <path d="M18 6.5a8 8 0 0 1 0 11" />
+      </symbol>
+      <symbol id="i-sound-off" viewBox="0 0 24 24">
+        <path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z" />
+        <path d="M16 9.5l5 5" />
+        <path d="M21 9.5l-5 5" />
+      </symbol>
+      <symbol id="i-settings" viewBox="0 0 24 24">
+        <path d="M4 7h9" />
+        <path d="M17 7h3" />
+        <circle cx="15" cy="7" r="2" />
+        <path d="M4 17h3" />
+        <path d="M11 17h9" />
+        <circle cx="9" cy="17" r="2" />
+      </symbol>
+    </svg>
+    <h1>Chess War UI kit</h1>
+    <p>
+      Components for the HUD, drawn with the tokens in <code>src/ui/theme.css</code> and the icons
+      in <code>assets/icons/</code>. Open this file in a browser.
+    </p>
+
+    <h2>Icons</h2>
+    <p>24 px grid, 2 px round stroke, <code>currentColor</code>, so they take the text color.</p>
+    <div class="row" id="icons"></div>
+
+    <h2>Buttons</h2>
+    <div class="row">
+      <button class="btn primary">Fight</button>
+      <button class="btn">
+        <svg class="ico" aria-hidden="true"><use href="#i-reroll" /></svg>Reroll 2g
+      </button>
+      <button class="btn on">
+        <svg class="ico" aria-hidden="true"><use href="#i-lock" /></svg>Shop locked
+      </button>
+      <button class="btn" disabled>
+        <svg class="ico" aria-hidden="true"><use href="#i-sell" /></svg>Sell
+      </button>
+      <button class="btn on" aria-pressed="true">
+        <svg class="ico" aria-hidden="true"><use href="#i-sound-on" /></svg>Sound
+      </button>
+      <button class="btn" aria-pressed="false">
+        <svg class="ico" aria-hidden="true"><use href="#i-sound-off" /></svg>Muted
+      </button>
+    </div>
+    <p>Primary, secondary, toggle on, disabled, toggle off.</p>
+
+    <h2>Panels and scoreboard</h2>
+    <div class="row">
+      <div class="pcard active" style="width: 260px">
+        <div class="nm"><span class="chip s0"></span><span class="txt">Player 1</span></div>
+        <div class="hpbar"><i style="width: 72%"></i></div>
+        <div class="stats">
+          <span
+            ><svg class="ico" aria-hidden="true"><use href="#i-hp" /></svg>
+            <b class="num">36</b> HP</span
+          >
+          <span
+            ><svg class="ico" aria-hidden="true"><use href="#i-gold" /></svg>
+            <b class="num">14</b> gold</span
+          >
+          <span
+            ><svg class="ico" aria-hidden="true"><use href="#i-xp" /></svg> Lv <b>4</b></span
+          >
+        </div>
+        <div class="bar" title="XP 3/6"><i style="width: 50%; background: var(--brass)"></i></div>
+        <span class="badge">3 win streak</span>
+      </div>
+      <div class="pcard" style="width: 260px">
+        <div class="nm"><span class="chip s1"></span><span class="txt">Iron Bot</span></div>
+        <div class="hpbar"><i class="low" style="width: 14%"></i></div>
+        <div class="stats">
+          <span
+            ><svg class="ico" aria-hidden="true"><use href="#i-hp" /></svg>
+            <b class="num">7</b> HP</span
+          >
+          <span
+            ><svg class="ico" aria-hidden="true"><use href="#i-gold" /></svg>
+            <b class="num">?</b> gold</span
+          >
+        </div>
+      </div>
+    </div>
+
+    <h2>Bench slots, speed control, tooltip</h2>
+    <div class="row">
+      <div class="bench" style="display: flex; gap: 8px">
+        <button class="slot" aria-label="Empty bench slot"></button>
+        <button class="slot full"><span class="g">♞</span><span class="st">★</span></button>
+        <button class="slot full sel"><span class="g">♜</span><span class="st">★★</span></button>
+      </div>
+      <div class="speed" role="group" aria-label="Playback speed">
+        <button class="on">1×</button><button>2×</button><button>4×</button>
+      </div>
+      <span class="tip" role="tooltip">Knight: jumps, forks at 2★</span>
+    </div>
+    <p>Bench: empty, filled, selected.</p>
+
+    <script>
+      const names = [
+        'gold',
+        'xp',
+        'hp',
+        'reroll',
+        'lock',
+        'sell',
+        'sound-on',
+        'sound-off',
+        'settings',
+      ];
+      const holder = document.getElementById('icons');
+      for (const name of names) {
+        const cell = document.createElement('div');
+        cell.className = 'icon-cell';
+        const ico = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        ico.setAttribute('class', 'ico');
+        const use = document.createElementNS('http://www.w3.org/2000/svg', 'use');
+        use.setAttribute('href', `#i-${name}`);
+        ico.append(use);
+        cell.append(ico, name);
+        holder.append(cell);
+      }
+    </script>
+  </body>
+</html>

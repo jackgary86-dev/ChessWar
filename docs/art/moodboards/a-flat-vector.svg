@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" width="640" height="400" role="img" aria-label="Option A: flat vector">
+  <rect width="320" height="200" fill="#14120e"/>
+  <g><rect x="20" y="20" width="60" height="60" fill="#dccca5"/><rect x="80" y="20" width="60" height="60" fill="#9c805a"/>
+  <rect x="20" y="80" width="60" height="60" fill="#9c805a"/><rect x="80" y="80" width="60" height="60" fill="#dccca5"/></g>
+  <g stroke="#1c1914" stroke-width="2.5" stroke-linejoin="round" fill="#f1e9d4" transform="translate(23 22) scale(.9)"><rect x="15" y="50" width="34" height="8" rx="3.5"/><path d="M21 50 Q24 40 27 35 L37 35 Q40 40 43 50 Z"/><ellipse cx="32" cy="35" rx="10" ry="3.2"/><circle cx="32" cy="24" r="8.5"/></g>
+  <g stroke="#ede5d1" stroke-width="2.5" stroke-linejoin="round" fill="#2b271f" transform="translate(83 82) scale(.9)"><rect x="15" y="50" width="34" height="8" rx="3.5"/><path d="M21 50 Q24 40 27 35 L37 35 Q40 40 43 50 Z"/><ellipse cx="32" cy="35" rx="10" ry="3.2"/><circle cx="32" cy="24" r="8.5"/></g>
+  <text x="170" y="50" font-family="Georgia, serif" font-size="22" fill="#ede5d1">Chess War</text>
+  <text x="170" y="72" font-family="monospace" font-size="11" fill="#a39985">Nf3 × e5   +3 gold</text>
+  <rect x="170" y="90" width="120" height="8" rx="4" fill="#3b3529"/><rect x="170" y="90" width="84" height="8" rx="4" fill="#d3a64d"/>
+  <text x="20" y="170" font-family="sans-serif" font-size="11" fill="#a39985">A · Flat vector: solid fills, one outline weight, brass accents.</text>
+  <text x="20" y="186" font-family="sans-serif" font-size="11" fill="#a39985">Crisp at any size, tiny files, easy to recolor for tiers and stars.</text>
+</svg>

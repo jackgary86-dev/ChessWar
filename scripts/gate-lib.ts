@@ -5,7 +5,10 @@
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { playAiMatch } from '../src/sim/match.ts';
+import { playAiMatch, playMirroredPair, summarize } from '../src/sim/match.ts';
+import type { MatchReport } from '../src/sim/match.ts';
+
+const PERCENT = 100;
 
 export interface CheckResult {
   name: string;
@@ -92,4 +95,74 @@ export function formatReport(report: GateReport): string {
 
 export function gatePasses(report: GateReport): boolean {
   return report.results.every((r) => r.ok);
+}
+
+/** Beta needs the Alpha checks plus these. */
+export const BETA_REQUIRED_FILES: readonly string[] = [
+  ...ALPHA_REQUIRED_FILES,
+  'assets/brand/logo-mark.svg',
+  'assets/pieces/P-ivory.svg',
+  'assets/pieces/P-ebony.svg',
+  'assets/pieces/N-ivory.svg',
+  'assets/pieces/N-ebony.svg',
+  'assets/pieces/B-ivory.svg',
+  'assets/pieces/B-ebony.svg',
+  'assets/pieces/R-ivory.svg',
+  'assets/pieces/R-ebony.svg',
+  'assets/pieces/Q-ivory.svg',
+  'assets/pieces/Q-ebony.svg',
+  'docs/PERFORMANCE.md',
+  'tests/accessibility.test.ts',
+  'tests/online-bugcheck.test.ts',
+];
+
+export const BETA_COMMANDS: readonly CommandCheck[] = [
+  ...ALPHA_COMMANDS,
+  {
+    name: 'performance budgets',
+    command: 'npx',
+    args: ['vitest', 'run', 'tests/performance.test.ts'],
+  },
+  {
+    name: 'accessibility checks',
+    command: 'npx',
+    args: ['vitest', 'run', 'tests/accessibility.test.ts'],
+  },
+  { name: 'save and resume checks', command: 'npx', args: ['vitest', 'run', 'tests/save.test.ts'] },
+];
+
+export const BETA_MANUAL: readonly string[] = [
+  'Milestones M3 and M4 are closed on GitHub',
+  'Final piece, board and portal art is in the game (no placeholders left)',
+  'All issues labelled must-fix from the Alpha feedback review are closed',
+  'Browser and device check (ticket 046) signed off on real browsers and phones',
+  'Performance on a mid-range phone and home Wi-Fi signed off (docs/PERFORMANCE.md)',
+  'No open issue labelled sev:blocker or sev:major (search: is:issue is:open label:sev:blocker,sev:major)',
+];
+
+/** Neither side may win more than this share of the mirrored sim games. */
+export const BETA_MAX_WIN_RATE = 0.55;
+export const BETA_SIM_GAMES = 500;
+
+/** Pure: the balance verdict for a set of match reports. */
+export function checkBalance(
+  reports: readonly MatchReport[],
+  maxWinRate: number = BETA_MAX_WIN_RATE,
+): CheckResult {
+  const summary = summarize(reports);
+  const worst = Math.max(summary.wins[0], summary.wins[1]) / Math.max(1, summary.games);
+  const percent = (n: number): string => (n * PERCENT).toFixed(1);
+  return {
+    name: `balance: neither side above ${percent(maxWinRate)}%`,
+    ok: summary.games > 0 && worst <= maxWinRate,
+    detail: `${String(summary.games)} games, Ivory ${String(summary.wins[0])}, Ebony ${String(summary.wins[1])}, worst side ${percent(worst)}%`,
+  };
+}
+
+export function playBalanceGames(games: number, seed = 1): MatchReport[] {
+  const reports: MatchReport[] = [];
+  for (let i = 0; reports.length < games; i++) {
+    reports.push(...playMirroredPair(seed + i).slice(0, games - reports.length));
+  }
+  return reports;
 }

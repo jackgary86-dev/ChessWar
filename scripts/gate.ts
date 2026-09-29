@@ -1,7 +1,7 @@
 /**
  * Release gate checker.
  *
- * Usage: npm run gate -- alpha [--skip-commands]
+ * Usage: npm run gate -- alpha|beta [--skip-commands]
  *
  * Runs the automated checks for a gate, lists what a person must still confirm,
  * and exits 1 if any automated check fails. It never declares the gate open:
@@ -14,10 +14,16 @@ import {
   ALPHA_COMMANDS,
   ALPHA_MANUAL,
   ALPHA_REQUIRED_FILES,
+  BETA_COMMANDS,
+  BETA_MANUAL,
+  BETA_REQUIRED_FILES,
+  BETA_SIM_GAMES,
   checkAiMatchFinishes,
+  checkBalance,
   checkFiles,
   formatReport,
   gatePasses,
+  playBalanceGames,
 } from './gate-lib.ts';
 import type { CheckResult, GateReport } from './gate-lib.ts';
 
@@ -30,17 +36,19 @@ const { values, positionals } = parseArgs({
 });
 
 const gate = positionals[0];
-if (gate !== 'alpha') {
-  console.error('Usage: npm run gate -- alpha [--skip-commands]');
+if (gate !== 'alpha' && gate !== 'beta') {
+  console.error('Usage: npm run gate -- alpha|beta [--skip-commands]');
   process.exit(1);
 }
 
+const isBeta = gate === 'beta';
 const results: CheckResult[] = [
-  ...checkFiles(process.cwd(), ALPHA_REQUIRED_FILES),
+  ...checkFiles(process.cwd(), isBeta ? BETA_REQUIRED_FILES : ALPHA_REQUIRED_FILES),
   checkAiMatchFinishes(AI_SEED),
 ];
+if (isBeta) results.push(checkBalance(playBalanceGames(BETA_SIM_GAMES)));
 if (!values['skip-commands']) {
-  for (const check of ALPHA_COMMANDS) {
+  for (const check of isBeta ? BETA_COMMANDS : ALPHA_COMMANDS) {
     const run = spawnSync(check.command, check.args, { stdio: 'ignore' });
     const ok = run.status === 0;
     results.push({
@@ -51,6 +59,6 @@ if (!values['skip-commands']) {
   }
 }
 
-const report: GateReport = { gate, results, manual: [...ALPHA_MANUAL] };
+const report: GateReport = { gate, results, manual: [...(isBeta ? BETA_MANUAL : ALPHA_MANUAL)] };
 console.log(formatReport(report));
 process.exit(gatePasses(report) ? 0 : 1);

@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
+import { playMirroredPair } from '@sim/match.ts';
 import {
   ALPHA_COMMANDS,
+  BETA_COMMANDS,
+  BETA_MANUAL,
+  BETA_REQUIRED_FILES,
+  checkBalance,
+  playBalanceGames,
   ALPHA_MANUAL,
   ALPHA_REQUIRED_FILES,
   checkAiMatchFinishes,
@@ -44,5 +50,35 @@ describe('alpha gate checker', () => {
     expect(text).toContain('[FAIL] x');
     expect(text).toContain('[ ] Sign off');
     expect(text).toContain('not open');
+  });
+});
+
+describe('beta gate checker', () => {
+  it('requires everything Alpha does, plus the final art', () => {
+    expect(BETA_REQUIRED_FILES).toEqual(expect.arrayContaining([...ALPHA_REQUIRED_FILES]));
+    const art = BETA_REQUIRED_FILES.filter((f) => f.startsWith('assets/'));
+    expect(checkFiles(process.cwd(), art).filter((r) => !r.ok)).toEqual([]);
+  });
+
+  it('adds performance, accessibility and save checks to the alpha commands', () => {
+    const names = BETA_COMMANDS.map((c) => c.name);
+    expect(names).toEqual(
+      expect.arrayContaining(['lint', 'performance budgets', 'accessibility checks']),
+    );
+    expect(BETA_MANUAL.some((m) => m.includes('sev:major'))).toBe(true);
+  });
+
+  it('passes a balanced set of games and fails a lopsided one', () => {
+    const balanced = playBalanceGames(20);
+    expect(balanced).toHaveLength(20);
+    expect(checkBalance(balanced, 1).ok).toBe(true);
+    const win = balanced.find((r) => r.winner === 0);
+    if (!win) throw new Error('expected an Ivory win in 20 games');
+    const lopsided = Array.from({ length: 10 }, () => ({ ...win }));
+    expect(checkBalance(lopsided).ok).toBe(false);
+  });
+
+  it('plays mirrored pairs so each seed is seated both ways', () => {
+    expect(playMirroredPair(1)).toHaveLength(2);
   });
 });

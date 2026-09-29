@@ -37,6 +37,12 @@ export type Effect =
       readonly kind: 'ring';
       readonly pos: Pos;
       readonly progress: number;
+    }
+  | {
+      /** Light burst at a portal square as a piece passes through. */
+      readonly kind: 'burst';
+      readonly pos: Pos;
+      readonly progress: number;
     };
 
 export interface Frame {
@@ -74,6 +80,7 @@ const HALF = 0.5;
 const LINE_LIFETIME = 0.7;
 const FLOAT_LIFETIME = 1.6;
 const RING_LIFETIME = 1;
+const BURST_LIFETIME = 1.2;
 /** A dying piece fades out over this many ticks. */
 const FADE_LIFETIME = 1;
 /** Knight hop height in squares at the top of its arc. */
@@ -131,6 +138,14 @@ export function frameAt(
         unit.y = event.from.y + (event.to.y - event.from.y) * p;
         const hopping = unit.snap.type === 'N' && !reducedMotion && progress < FULL;
         unit.lift = hopping ? Math.sin(progress * Math.PI) * KNIGHT_HOP : 0;
+        if (event.kind === 'portal' && age < BURST_LIFETIME) {
+          // One burst where the piece entered the portal and one where it came out.
+          const burst = reducedMotion ? HALF : age / BURST_LIFETIME;
+          effects.push(
+            { kind: 'burst', pos: event.from, progress: burst },
+            { kind: 'burst', pos: event.to, progress: burst },
+          );
+        }
         break;
       }
       case 'strike': {

@@ -14,6 +14,7 @@ import type { Layout } from './layout.ts';
 import { pieceSprite } from './sprites.ts';
 import { drawFrame, drawTiles, drawWall } from './board-art.ts';
 import type { BoardPalette } from './board-art.ts';
+import { drawBridgeSpan, drawBurst, drawPortalSquare } from './portal-art.ts';
 import { pipOffsets, starStyle } from './stars.ts';
 
 export interface DrawPiece {
@@ -135,9 +136,6 @@ const LOW_HP = 0.35;
 const BRIDGE_HEIGHT = 0.34;
 const SELECTION_WIDTH = 0.07;
 const HIGHLIGHT_ALPHA = 0.35;
-const PORTAL_ALPHA_BASE = 0.55;
-const PORTAL_ALPHA_SWING = 0.3;
-const PORTAL_PERIOD_MS = 1600;
 const TWO_PI = Math.PI * 2;
 const SHADOW_COLOR = 'rgba(0,0,0,0.55)';
 const RANK_ONE_Y = BOARD.height - 1;
@@ -167,34 +165,36 @@ function drawPortals(
   timeMs: number,
   reducedMotion: boolean,
 ): void {
-  const pulse = reducedMotion ? 0 : Math.sin((timeMs / PORTAL_PERIOD_MS) * TWO_PI);
-  const alpha = PORTAL_ALPHA_BASE + PORTAL_ALPHA_SWING * pulse;
   const { cell, wallGap } = layout;
-  ctx.fillStyle = theme.portal;
+  const colors = { portal: theme.portal, wall: theme.wall };
   // Bridges span the wall gap between the two portal squares of each rank.
   const bridgeThickness = cell * BRIDGE_HEIGHT;
   const ranks = new Set(BOARD.portals.map((p) => p.y));
   for (const y of ranks) {
     const left = layout.toScreen({ x: BOARD.wallLeftX, y });
     const right = layout.toScreen({ x: BOARD.wallRightX, y });
-    ctx.globalAlpha = alpha;
     if (layout.stacked) {
       const top = Math.min(left.y, right.y) + cell;
-      ctx.fillRect(left.x + (cell - bridgeThickness) / 2, top, bridgeThickness, wallGap);
+      const rect = {
+        x: left.x + (cell - bridgeThickness) / 2,
+        y: top,
+        w: bridgeThickness,
+        h: wallGap,
+      };
+      drawBridgeSpan(ctx, rect, 'y', colors, timeMs, reducedMotion);
     } else {
-      ctx.fillRect(left.x + cell, left.y + (cell - bridgeThickness) / 2, wallGap, bridgeThickness);
+      const rect = {
+        x: left.x + cell,
+        y: left.y + (cell - bridgeThickness) / 2,
+        w: wallGap,
+        h: bridgeThickness,
+      };
+      drawBridgeSpan(ctx, rect, 'x', colors, timeMs, reducedMotion);
     }
   }
   for (const p of BOARD.portals) {
-    const at = layout.toScreen(p);
-    ctx.globalAlpha = alpha;
-    ctx.fillRect(at.x, at.y, cell, cell);
-    ctx.globalAlpha = 1;
-    ctx.strokeStyle = theme.portal;
-    ctx.lineWidth = Math.max(1, cell * OUTLINE_WIDTH);
-    ctx.strokeRect(at.x + 1, at.y + 1, cell - 2, cell - 2);
+    drawPortalSquare(ctx, layout.toScreen(p), cell, colors, timeMs, reducedMotion);
   }
-  ctx.globalAlpha = 1;
 }
 
 function drawNotation(ctx: CanvasRenderingContext2D, layout: Layout, theme: Theme): void {
@@ -405,6 +405,8 @@ function drawEffects(
       ctx.strokeText(effect.text, c.x, y);
       ctx.fillStyle = effect.tone === 'damage' ? theme.crimson : theme.heal;
       ctx.fillText(effect.text, c.x, y);
+    } else if (effect.kind === 'burst') {
+      drawBurst(ctx, centerOf(layout, effect.pos), cell, theme.portal, effect.progress);
     } else {
       const c = centerOf(layout, effect.pos);
       ctx.beginPath();

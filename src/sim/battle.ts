@@ -9,17 +9,24 @@
  * pattern (moving onto the square on a kill), otherwise it steps along the
  * path from `pathfinding.ts`, otherwise it waits one tick.
  *
- * Star abilities (#9) and the idle / material end conditions (#10) build on
- * this loop. Here a battle ends when one side is wiped out, or at the hard
- * `BATTLE.maxTicks` cap.
+ * Star abilities (2★ / 3★) fire as part of the strike. The idle / material end
+ * conditions (#10) build on this loop; here a battle ends when one side is
+ * wiped out, or at the hard `BATTLE.maxTicks` cap.
  */
-import { generateStrikes, sideOfX, squareName } from './board.ts';
+import {
+  ORTHOGONAL_DIRS,
+  generateStrikes,
+  inBounds,
+  sideOfX,
+  squareName,
+  stepAllowed,
+} from './board.ts';
 import type { Pos } from './board.ts';
-import { BATTLE, BOARD, PIECES, unitAtk, unitHp } from './data.ts';
+import { ABILITY, BATTLE, BOARD, PIECES, unitAtk, unitHp } from './data.ts';
 import { findStep } from './pathfinding.ts';
 import { int, shuffle } from './rng.ts';
 import type { Rng } from './rng.ts';
-import type { PieceType, Side, StarLevel } from './types.ts';
+import type { AbilityStar, PieceType, Side, StarLevel } from './types.ts';
 
 /** A piece placed on a board before the fight. `pos` is in world coordinates. */
 export interface ArmyPiece {
@@ -65,6 +72,16 @@ export type BattleEvent =
       readonly target: number;
       readonly damage: number;
       readonly targetHp: number;
+      /** Plain strike, or damage dealt by a Knight Fork / Queen Pierce ability. */
+      readonly via: 'strike' | 'fork' | 'pierce';
+    }
+  | {
+      /** Bishop Blessing: `amount` is the HP actually restored (never above max). */
+      readonly kind: 'heal';
+      readonly tick: number;
+      readonly healer: number;
+      readonly target: number;
+      readonly amount: number;
     }
   | {
       readonly kind: 'death';
@@ -155,9 +172,35 @@ function checkFinished(state: BattleState): void {
   }
 }
 
-function damageFor(attacker: BattleUnit, _target: BattleUnit): number {
-  const raw = attacker.atk * BASE_DAMAGE_MULT * (1 - NO_ARMOR);
-  return Math.max(BATTLE.minDamage, Math.round(raw));
+/** Star level that unlocks an ability, or null at 1★ (abilities are off). */
+function abilityStar(unit: BattleUnit): AbilityStar | null {
+  return unit.stars === 1 ? null : unit.stars;
+}
+
+/**
+ * Fraction of incoming damage a unit shrugs off: Rook Fortress, or Pawn Shield
+ * Wall while a friendly piece stands orthogonally adjacent.
+ */
+function armorOf(target: BattleUnit, at: ReadonlyMap<number, BattleUnit>): number {
+  const star = abilityStar(target);
+  if (star === null) return NO_ARMOR;
+  if (target.type === 'R') return ABILITY.fortressReduction[star];
+  if (target.type === 'P') {
+    const guarded = ORTHOGONAL_DIRS.some((dir) => {
+      const near = at.get(posKey({ x: target.x + dir.x, y: target.y + dir.y }));
+      return near?.side === target.side;
+    });
+    return guarded ? ABILITY.shieldWallReduction[star] : NO_ARMOR;
+  }
+  return NO_ARMOR;
+}
+
+function damageFor(attacker: BattleUnit, mult: number, armor: number): number {
+  return Math.max(BATTLE.minDamage, Math.round(attacker.atk * mult * (1 - armor)));
+}
+
+function lowestHpFirst(a: BattleUnit, b: BattleUnit): number {
+  return a.hp - b.hp || a.id - b.id;
 }
 
 function moveUnit(state: BattleState, unit: BattleUnit, to: Pos): void {
@@ -170,6 +213,74 @@ function moveUnit(state: BattleState, unit: BattleUnit, to: Pos): void {
   }
 }
 
+function hit(
+  state: BattleState,
+  at: Map<number, BattleUnit>,
+  attacker: BattleUnit,
+  target: BattleUnit,
+  mult: number,
+  via: 'strike' | 'fork' | 'pierce',
+): void {
+  const damage = damageFor(attacker, mult, armorOf(target, at));
+  target.hp = Math.max(0, target.hp - damage);
+  state.events.push({
+    kind: 'strike',
+    tick: state.tick,
+    attacker: attacker.id,
+    target: target.id,
+    damage,
+    targetHp: target.hp,
+    via,
+  });
+  state.lastDamageTick = state.tick;
+  if (target.hp === 0) {
+    at.delete(posKey(target));
+    state.events.push({
+      kind: 'death',
+      tick: state.tick,
+      unit: target.id,
+      pos: { x: target.x, y: target.y },
+    });
+  }
+}
+
+/** The enemy directly behind `target`, as seen from `attacker` (Queen Pierce). */
+function behind(
+  attacker: BattleUnit,
+  target: BattleUnit,
+  at: ReadonlyMap<number, BattleUnit>,
+): BattleUnit | undefined {
+  const next = {
+    x: target.x + Math.sign(target.x - attacker.x),
+    y: target.y + Math.sign(target.y - attacker.y),
+  };
+  if (!inBounds(next) || !stepAllowed(target, next)) return undefined;
+  const other = at.get(posKey(next));
+  return other !== undefined && other.side !== attacker.side ? other : undefined;
+}
+
+/** Bishop Blessing: heal the most wounded living ally (biggest HP gap). */
+function bless(state: BattleState, healer: BattleUnit, star: AbilityStar): void {
+  let wounded: BattleUnit | null = null;
+  for (const ally of alive(state)) {
+    if (ally.side !== healer.side || ally.hp >= ally.maxHp) continue;
+    if (wounded === null || ally.maxHp - ally.hp > wounded.maxHp - wounded.hp) wounded = ally;
+  }
+  if (wounded === null) return;
+  const before = wounded.hp;
+  wounded.hp = Math.min(
+    wounded.maxHp,
+    wounded.hp + Math.round(healer.atk * ABILITY.blessingHealRatio[star]),
+  );
+  state.events.push({
+    kind: 'heal',
+    tick: state.tick,
+    healer: healer.id,
+    target: wounded.id,
+    amount: wounded.hp - before,
+  });
+}
+
 function act(state: BattleState, unit: BattleUnit): void {
   const living = alive(state);
   const at = new Map(living.map((u) => [posKey(u), u]));
@@ -178,31 +289,32 @@ function act(state: BattleState, unit: BattleUnit): void {
 
   const targets = generateStrikes(unit.type, unit.side, from, occupied)
     .map((p) => at.get(posKey(p)))
-    .filter((u): u is BattleUnit => u !== undefined && u.side !== unit.side);
+    .filter((u): u is BattleUnit => u !== undefined && u.side !== unit.side)
+    .sort(lowestHpFirst);
 
-  const target = targets.reduce<BattleUnit | null>(
-    (best, t) =>
-      best === null || t.hp < best.hp || (t.hp === best.hp && t.id < best.id) ? t : best,
-    null,
-  );
-
-  if (target !== null) {
-    const damage = damageFor(unit, target);
-    target.hp = Math.max(0, target.hp - damage);
-    state.events.push({
-      kind: 'strike',
-      tick: state.tick,
-      attacker: unit.id,
-      target: target.id,
-      damage,
-      targetHp: target.hp,
-    });
-    state.lastDamageTick = state.tick;
-    if (target.hp === 0) {
-      const pos = { x: target.x, y: target.y };
-      state.events.push({ kind: 'death', tick: state.tick, unit: target.id, pos });
-      moveUnit(state, unit, pos);
+  const [target, ...others] = targets;
+  if (target !== undefined) {
+    const star = abilityStar(unit);
+    // Extra victims are picked before the strike lands so a kill cannot change them.
+    const extras: { unit: BattleUnit; mult: number; via: 'fork' | 'pierce' }[] = [];
+    if (star !== null && unit.type === 'N') {
+      for (const other of others.slice(0, ABILITY.forkExtraTargets[star])) {
+        extras.push({ unit: other, mult: BASE_DAMAGE_MULT, via: 'fork' });
+      }
     }
+    if (star !== null && unit.type === 'Q') {
+      const rear = behind(unit, target, at);
+      if (rear !== undefined) {
+        extras.push({ unit: rear, mult: ABILITY.pierceRatio[star], via: 'pierce' });
+      }
+    }
+
+    const targetPos = { x: target.x, y: target.y };
+    hit(state, at, unit, target, BASE_DAMAGE_MULT, 'strike');
+    for (const extra of extras) hit(state, at, unit, extra.unit, extra.mult, extra.via);
+    if (star !== null && unit.type === 'B') bless(state, unit, star);
+    // Like a chess capture: move onto the fallen target's square if it is free.
+    if (target.hp === 0 && !occupied(targetPos)) moveUnit(state, unit, targetPos);
     unit.cooldown = PIECES[unit.type].speed;
     return;
   }

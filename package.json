@@ -18,7 +18,8 @@
     "sim": "tsx scripts/sim.ts",
     "server": "tsx scripts/server.ts",
     "pieces": "tsx scripts/build-pieces.ts",
-    "icons": "tsx scripts/build-icons.ts"
+    "icons": "tsx scripts/build-icons.ts",
+    "fuzz": "tsx scripts/fuzz.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

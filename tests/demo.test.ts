@@ -1,15 +1,20 @@
 import { describe, expect, it } from 'vitest';
+import { boardCap } from '@sim/data.ts';
 import { createAiPrep } from '@sim/ai.ts';
 import { buyCard, createGame, nextRound, ready, skipCombat } from '@sim/game.ts';
 import type { GameState } from '@sim/game.ts';
 import {
   DEMO_ROUNDS,
+  FIRST_MATCH_TIP_ROUNDS,
   demoFinished,
   demoTip,
+  firstMatchTip,
   fullGameHref,
   isDemo,
   mergeNudge,
 } from '../src/ui/demo-model.ts';
+import { TIPS_KEY, markTipsDone, tipsDone } from '../src/ui/storage.ts';
+import type { StorageLike } from '../src/ui/storage.ts';
 import { overlayView } from '../src/ui/overlays-model.ts';
 
 const aiPrep = createAiPrep('normal');
@@ -100,5 +105,77 @@ describe('demo length and end screen', () => {
     playRound(game);
     const view = overlayView(game, { started: true, animationDone: true });
     expect(view).toMatchObject({ kind: 'result', button: 'Next round' });
+  });
+});
+
+describe('first-match hints in the full game', () => {
+  function fillBoard(game: GameState, count: number, benched: boolean): void {
+    const { holdings } = game.players[0];
+    for (let i = 0; i < count; i++) {
+      holdings.board.push({ id: 800 + i, type: 'P', stars: 1, x: i, y: 0 });
+    }
+    if (benched) holdings.bench[0] = { id: 850, type: 'R', stars: 1 };
+  }
+  it('is the same guidance the demo shows', () => {
+    const game = fresh();
+    expect(firstMatchTip(game)).toEqual(demoTip(game));
+  });
+  it('explains the board cap when the board is full and a piece waits on the bench', () => {
+    const game = fresh();
+    const cap = boardCap(game.players[0].econ.level);
+    fillBoard(game, cap, true);
+    const tip = firstMatchTip(game);
+    expect(tip?.step).toBe('cap');
+    expect(tip?.text).toMatch(/level/i);
+  });
+  it('does not mention the cap while there is room or nothing on the bench', () => {
+    const roomy = fresh();
+    fillBoard(roomy, boardCap(roomy.players[0].econ.level) - 1, true);
+    expect(firstMatchTip(roomy)?.step).toBe('portals');
+    const noBench = fresh();
+    fillBoard(noBench, boardCap(noBench.players[0].econ.level), false);
+    expect(firstMatchTip(noBench)?.step).toBe('portals');
+  });
+  it('shows only the cap hint in rounds 2 and 3, and nothing later or during a fight', () => {
+    const game = fresh();
+    game.round = 2;
+    expect(firstMatchTip(game)).toBeNull();
+    fillBoard(game, boardCap(game.players[0].econ.level), true);
+    expect(firstMatchTip(game)?.step).toBe('cap');
+    game.round = FIRST_MATCH_TIP_ROUNDS + 1;
+    expect(firstMatchTip(game)).toBeNull();
+    game.round = 1;
+    game.phase = 'combat';
+    expect(firstMatchTip(game)).toBeNull();
+  });
+  it('remembers that the hints were seen, and survives blocked storage', () => {
+    const data = new Map<string, string>();
+    const storage: StorageLike = {
+      getItem: (k) => data.get(k) ?? null,
+      setItem: (k, v) => {
+        data.set(k, v);
+      },
+      removeItem: (k) => {
+        data.delete(k);
+      },
+    };
+    expect(tipsDone(storage)).toBe(false);
+    markTipsDone(storage);
+    expect(data.get(TIPS_KEY)).toBe('1');
+    expect(tipsDone(storage)).toBe(true);
+    const blocked: StorageLike = {
+      getItem: () => {
+        throw new Error('blocked');
+      },
+      setItem: () => {
+        throw new Error('blocked');
+      },
+      removeItem: () => undefined,
+    };
+    expect(tipsDone(blocked)).toBe(false);
+    expect(() => {
+      markTipsDone(blocked);
+    }).not.toThrow();
+    expect(tipsDone(null)).toBe(false);
   });
 });

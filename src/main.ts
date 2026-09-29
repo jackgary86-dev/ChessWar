@@ -35,7 +35,14 @@ import { battleLog, detectMerges, resultLogLine } from '@ui/log-model.ts';
 import { createOverlays } from '@ui/overlays.ts';
 import { createSound } from '@ui/sound.ts';
 import { cuesForEvents, roundCue } from '@ui/sound-model.ts';
-import { browserStorage, clearSave, loadGame, saveGame } from '@ui/storage.ts';
+import {
+  DISCARDED_SAVE_MESSAGE,
+  browserStorage,
+  clearSave,
+  loadGame,
+  readSave,
+  saveGame,
+} from '@ui/storage.ts';
 import { overlayView, visiblePrepSides } from '@ui/overlays-model.ts';
 import { applyDrop, attachDrag } from '@ui/drag.ts';
 import type { DropTarget } from '@ui/drag.ts';
@@ -101,7 +108,10 @@ const aiPrep = createAiPrep('normal');
 let game: GameState = createGame({ mode: 'ai', seed: SEED }, aiPrep);
 let started = false;
 const storage = browserStorage();
-let hasSave = loadGame(storage) !== null;
+const firstRead = readSave(storage);
+let hasSave = firstRead.game !== null;
+/** Shown on the start screen when a damaged or outdated save was thrown away. */
+let saveNotice: string | undefined = firstRead.discarded ? DISCARDED_SAVE_MESSAGE : undefined;
 
 /** Save at the start of a prep phase, or drop the save once the war is over. */
 function persist(): void {
@@ -285,6 +295,7 @@ function refresh(): void {
         started: started || online !== null,
         animationDone: animating === null,
         canContinue: hasSave,
+        ...(saveNotice ? { notice: saveNotice } : {}),
       }),
   );
 }
@@ -387,6 +398,7 @@ const overlays = createOverlays(app, {
   start(mode: GameMode) {
     game = createGame({ mode, seed: SEED + game.round }, aiPrep);
     started = true;
+    saveNotice = undefined;
     logPanel.clear();
     selection = null;
     animating = null;
@@ -395,14 +407,17 @@ const overlays = createOverlays(app, {
     refresh();
   },
   continueSaved() {
-    const saved = loadGame(storage);
+    const read = readSave(storage);
+    const saved = read.game;
     if (!saved) {
       hasSave = false;
+      if (read.discarded) saveNotice = DISCARDED_SAVE_MESSAGE;
       refresh();
       return;
     }
     game = saved;
     started = true;
+    saveNotice = undefined;
     logPanel.clear();
     selection = null;
     animating = null;

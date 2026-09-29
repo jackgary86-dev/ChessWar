@@ -15,7 +15,7 @@ export type ResultTone = 'win' | 'lose' | 'draw';
 
 export type OverlayView =
   | OnlineOverlay
-  | { readonly kind: 'start'; readonly canContinue: boolean }
+  | { readonly kind: 'start'; readonly canContinue: boolean; readonly notice?: string }
   | {
       readonly kind: 'handoff';
       readonly round: number;
@@ -47,6 +47,8 @@ export interface OverlayContext {
   readonly animationDone: boolean;
   /** A saved match is available to resume. */
   readonly canContinue?: boolean;
+  /** A note for the start screen, e.g. that a damaged save was discarded. */
+  readonly notice?: string;
 }
 
 function otherSide(side: Side): Side {
@@ -68,7 +70,13 @@ function toneOf(game: GameState, winner: Side | null): ResultTone {
 
 /** The overlay to show, or null when the board and HUD are in play. */
 export function overlayView(game: GameState, context: OverlayContext): OverlayView | null {
-  if (!context.started) return { kind: 'start', canContinue: context.canContinue === true };
+  if (!context.started) {
+    return {
+      kind: 'start',
+      canContinue: context.canContinue === true,
+      ...(context.notice ? { notice: context.notice } : {}),
+    };
+  }
 
   if (game.phase === 'handoff') {
     return {

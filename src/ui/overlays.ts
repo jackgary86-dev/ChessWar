@@ -93,6 +93,7 @@ function boxFor(view: OverlayView, actions: OverlayActions): HTMLElement {
         logo('logo'),
         el('h2', 'wordmark', 'Chess War'),
         el('p', undefined, 'An auto-battler played with real chess pieces.'),
+        ...(view.notice ? [el('p', 'muted', view.notice)] : []),
         button(
           'Play vs AI',
           () => {

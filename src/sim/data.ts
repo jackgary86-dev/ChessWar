@@ -156,6 +156,27 @@ export const ABILITY = Object.freeze({
 });
 
 // ---------------------------------------------------------------------------
+// Battlefield (§3.1)
+// ---------------------------------------------------------------------------
+
+export const BOARD = Object.freeze({
+  /** World grid width: two 8-wide boards side by side. */
+  width: 16,
+  /** World grid height (ranks 1-8). */
+  height: 8,
+  /** Wall sits between this column and the next. */
+  wallLeftX: 7,
+  wallRightX: 8,
+  /** Portal squares (world x, y). y 2 and 5 are ranks 6 and 3. */
+  portals: Object.freeze([
+    Object.freeze({ x: 7, y: 2 }),
+    Object.freeze({ x: 7, y: 5 }),
+    Object.freeze({ x: 8, y: 2 }),
+    Object.freeze({ x: 8, y: 5 }),
+  ]),
+});
+
+// ---------------------------------------------------------------------------
 // Combat (§3.3)
 // ---------------------------------------------------------------------------
 

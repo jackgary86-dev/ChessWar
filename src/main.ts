@@ -27,6 +27,8 @@ import {
 } from '@ui/animation.ts';
 import type { UnitSnapshot } from '@ui/animation.ts';
 import { createHud } from '@ui/hud.ts';
+import { createFieldManual, createLogPanel } from '@ui/log.ts';
+import { battleLog, detectMerges, resultLogLine } from '@ui/log-model.ts';
 import { createOverlays } from '@ui/overlays.ts';
 import { overlayView, visiblePrepSides } from '@ui/overlays-model.ts';
 import { attachBoardInput, openSquares, tapBenchSlot, tapSquare } from '@ui/input.ts';
@@ -58,7 +60,9 @@ const toast = document.createElement('div');
 toast.className = 'toast';
 const hudRoot = document.createElement('div');
 hudRoot.className = 'hud';
-app.append(canvas, speedBar, toast, hudRoot);
+const infoRoot = document.createElement('div');
+infoRoot.className = 'hud';
+app.append(canvas, speedBar, toast, hudRoot, infoRoot);
 const maybeCtx = canvas.getContext('2d');
 if (!maybeCtx) {
   throw new Error('Canvas 2D is not supported');
@@ -78,6 +82,9 @@ let playback = createPlayback();
 let snapshot: UnitSnapshot[] = [];
 let animating: BattleState | null = null;
 let resultShownAtMs: number | null = null;
+let loggedLines = 0;
+const logPanel = createLogPanel(infoRoot);
+createFieldManual(infoRoot);
 
 function say(message: string): void {
   toast.textContent = message;
@@ -85,7 +92,9 @@ function say(message: string): void {
 
 const hud = createHud(hudRoot, {
   buy(slot) {
+    const before = structuredClone(game.players[acting()].holdings);
     const result = buyCard(game, acting(), slot);
+    logPanel.add(detectMerges(before, game.players[acting()].holdings));
     if (result === 'bench-full') say('Bench is full. Sell or place a piece first.');
     else if (result === 'gold') say('Not enough gold.');
     else say('');
@@ -117,6 +126,7 @@ const hud = createHud(hudRoot, {
       snapshot = snapshotUnits(game.battle);
       playback = createPlayback();
       resultShownAtMs = null;
+      loggedLines = 0;
     }
     refresh();
   },
@@ -140,6 +150,7 @@ const overlays = createOverlays(app, {
   start(mode: GameMode) {
     game = createGame({ mode, seed: SEED + game.round }, aiPrep);
     started = true;
+    logPanel.clear();
     selection = null;
     animating = null;
     say('');
@@ -215,10 +226,16 @@ function frame(nowMs: number): void {
       stepCombat(game);
     });
     ({ pieces, effects } = frameAt(snapshot, battle.events, playback.time, reducedMotion));
+    const lines = battleLog(snapshot, battle.events);
+    const due = lines.slice(loggedLines).filter((l) => l.tick - 1 < playback.time);
+    logPanel.add(due);
+    loggedLines += due.length;
     if (playbackDone(playback, battle)) {
       resultShownAtMs ??= nowMs;
       if (nowMs - resultShownAtMs > RESULT_HOLD_MS) {
         animating = null;
+        const line = resultLogLine(game);
+        if (line) logPanel.add([line]);
         refresh();
       }
     }

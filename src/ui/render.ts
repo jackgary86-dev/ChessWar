@@ -1,0 +1,311 @@
+/**
+ * Canvas drawing for the battlefield: boards, wall, portals, bridges, pieces.
+ *
+ * Reads a `Scene` and draws it; it never touches simulation state. Colors come
+ * from CSS custom properties (see theme.css) via `readTheme`. Animation and
+ * effects arrive with the combat-animation ticket and feed this renderer
+ * interpolated piece positions.
+ */
+import { BOARD } from '@sim/data.ts';
+import type { Pos } from '@sim/board.ts';
+import type { PieceType, Side, StarLevel } from '@sim/types.ts';
+import type { Layout } from './layout.ts';
+
+export interface DrawPiece {
+  readonly type: PieceType;
+  readonly side: Side;
+  readonly stars: StarLevel;
+  /** World position; may be fractional while a move is animating. */
+  readonly x: number;
+  readonly y: number;
+  /** Current and maximum HP; the bar shows only when `showHp` is set. */
+  readonly hp?: number;
+  readonly maxHp?: number;
+}
+
+export interface Scene {
+  readonly pieces: readonly DrawPiece[];
+  readonly showHp: boolean;
+  /** Squares to highlight, e.g. open squares while a bench piece is selected. */
+  readonly highlights?: readonly Pos[];
+}
+
+export interface Theme {
+  readonly sqLight: readonly [string, string];
+  readonly sqDark: readonly [string, string];
+  readonly ivory: string;
+  readonly ebony: string;
+  readonly wall: string;
+  readonly portal: string;
+  readonly brass: string;
+  readonly heal: string;
+  readonly crimson: string;
+  readonly muted: string;
+  readonly pieceFont: string;
+}
+
+const THEME_VARS = {
+  sqLight1: '--sq-light-1',
+  sqDark1: '--sq-dark-1',
+  sqLight2: '--sq-light-2',
+  sqDark2: '--sq-dark-2',
+  ivory: '--ivory',
+  ebony: '--ebony',
+  wall: '--wall',
+  portal: '--portal',
+  brass: '--brass',
+  heal: '--heal',
+  crimson: '--crimson',
+  muted: '--muted',
+  pieceFont: '--f-piece',
+} as const;
+
+export function readTheme(element: Element): Theme {
+  const style = getComputedStyle(element);
+  const get = (name: string): string => style.getPropertyValue(name).trim();
+  return {
+    sqLight: [get(THEME_VARS.sqLight1), get(THEME_VARS.sqLight2)],
+    sqDark: [get(THEME_VARS.sqDark1), get(THEME_VARS.sqDark2)],
+    ivory: get(THEME_VARS.ivory),
+    ebony: get(THEME_VARS.ebony),
+    wall: get(THEME_VARS.wall),
+    portal: get(THEME_VARS.portal),
+    brass: get(THEME_VARS.brass),
+    heal: get(THEME_VARS.heal),
+    crimson: get(THEME_VARS.crimson),
+    muted: get(THEME_VARS.muted),
+    pieceFont: get(THEME_VARS.pieceFont),
+  };
+}
+
+/** U+FE0E forces text presentation so glyphs don't render as emoji. */
+const TEXT_VS = '︎';
+export const PIECE_GLYPH: Readonly<Record<PieceType, string>> = Object.freeze({
+  P: `♟${TEXT_VS}`,
+  N: `♞${TEXT_VS}`,
+  B: `♝${TEXT_VS}`,
+  R: `♜${TEXT_VS}`,
+  Q: `♛${TEXT_VS}`,
+});
+
+const STAR = '★';
+const FILES = 'abcdefghijklmnop';
+
+// Drawing proportions, as fractions of one square.
+const GLYPH_SIZE = 0.78;
+const GLYPH_CENTER_Y = 0.46;
+const OUTLINE_WIDTH = 0.05;
+const SHADOW_BLUR = 0.12;
+const SHADOW_OFFSET = 0.05;
+const STAR_SIZE = 0.2;
+const STAR_Y = 0.88;
+const HP_BAR_HEIGHT = 0.09;
+const HP_BAR_WIDTH = 0.7;
+const HP_BAR_Y = 0.04;
+const LABEL_SIZE = 0.2;
+const LABEL_PAD = 0.06;
+const LOW_HP = 0.35;
+const BRIDGE_HEIGHT = 0.34;
+const HIGHLIGHT_ALPHA = 0.35;
+const PORTAL_ALPHA_BASE = 0.55;
+const PORTAL_ALPHA_SWING = 0.3;
+const PORTAL_PERIOD_MS = 1600;
+const TWO_PI = Math.PI * 2;
+const SHADOW_COLOR = 'rgba(0,0,0,0.55)';
+const RANK_ONE_Y = BOARD.height - 1;
+const SECOND_BOARD_X = BOARD.width / 2;
+
+/** Size the canvas for the device pixel ratio so it stays crisp on HiDPI. */
+export function fitCanvas(canvas: HTMLCanvasElement, layout: Layout, dpr: number): void {
+  canvas.width = Math.round(layout.width * dpr);
+  canvas.height = Math.round(layout.height * dpr);
+  canvas.style.width = `${String(layout.width)}px`;
+  canvas.style.height = `${String(layout.height)}px`;
+  canvas.getContext('2d')?.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+export function prefersReducedMotion(): boolean {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function drawSquares(ctx: CanvasRenderingContext2D, layout: Layout, theme: Theme): void {
+  const { cell } = layout;
+  for (let x = 0; x < BOARD.width; x++) {
+    const board = x < SECOND_BOARD_X ? 0 : 1;
+    for (let y = 0; y < BOARD.height; y++) {
+      const dark = (x + y) % 2 === 1;
+      ctx.fillStyle = dark ? theme.sqDark[board] : theme.sqLight[board];
+      const at = layout.toScreen({ x, y });
+      ctx.fillRect(at.x, at.y, cell, cell);
+    }
+  }
+}
+
+function drawWall(ctx: CanvasRenderingContext2D, layout: Layout, theme: Theme): void {
+  const first = layout.toScreen({ x: BOARD.wallLeftX, y: 0 });
+  const second = layout.toScreen({ x: BOARD.wallRightX, y: 0 });
+  ctx.fillStyle = theme.wall;
+  if (layout.stacked) {
+    ctx.fillRect(0, second.y + layout.cell, layout.width, layout.wallGap);
+  } else {
+    ctx.fillRect(first.x + layout.cell, 0, layout.wallGap, layout.height);
+  }
+}
+
+function drawPortals(
+  ctx: CanvasRenderingContext2D,
+  layout: Layout,
+  theme: Theme,
+  timeMs: number,
+  reducedMotion: boolean,
+): void {
+  const pulse = reducedMotion ? 0 : Math.sin((timeMs / PORTAL_PERIOD_MS) * TWO_PI);
+  const alpha = PORTAL_ALPHA_BASE + PORTAL_ALPHA_SWING * pulse;
+  const { cell, wallGap } = layout;
+  ctx.fillStyle = theme.portal;
+  // Bridges span the wall gap between the two portal squares of each rank.
+  const bridgeThickness = cell * BRIDGE_HEIGHT;
+  const ranks = new Set(BOARD.portals.map((p) => p.y));
+  for (const y of ranks) {
+    const left = layout.toScreen({ x: BOARD.wallLeftX, y });
+    const right = layout.toScreen({ x: BOARD.wallRightX, y });
+    ctx.globalAlpha = alpha;
+    if (layout.stacked) {
+      const top = Math.min(left.y, right.y) + cell;
+      ctx.fillRect(left.x + (cell - bridgeThickness) / 2, top, bridgeThickness, wallGap);
+    } else {
+      ctx.fillRect(left.x + cell, left.y + (cell - bridgeThickness) / 2, wallGap, bridgeThickness);
+    }
+  }
+  for (const p of BOARD.portals) {
+    const at = layout.toScreen(p);
+    ctx.globalAlpha = alpha;
+    ctx.fillRect(at.x, at.y, cell, cell);
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = theme.portal;
+    ctx.lineWidth = Math.max(1, cell * OUTLINE_WIDTH);
+    ctx.strokeRect(at.x + 1, at.y + 1, cell - 2, cell - 2);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawNotation(ctx: CanvasRenderingContext2D, layout: Layout, theme: Theme): void {
+  const { cell } = layout;
+  ctx.font = `600 ${String(Math.round(cell * LABEL_SIZE))}px ${theme.pieceFont}`;
+  ctx.textBaseline = 'top';
+  ctx.textAlign = 'left';
+  const pad = cell * LABEL_PAD;
+  for (let x = 0; x < BOARD.width; x++) {
+    for (let y = 0; y < BOARD.height; y++) {
+      const showFile = y === RANK_ONE_Y;
+      const showRank = x === 0 || x === SECOND_BOARD_X;
+      if (!showFile && !showRank) continue;
+      const at = layout.toScreen({ x, y });
+      const dark = (x + y) % 2 === 1;
+      ctx.fillStyle = dark
+        ? theme.sqLight[x < SECOND_BOARD_X ? 0 : 1]
+        : theme.sqDark[x < SECOND_BOARD_X ? 0 : 1];
+      if (showRank) ctx.fillText(String(BOARD.height - y), at.x + pad, at.y + pad);
+      if (showFile) {
+        ctx.textBaseline = 'bottom';
+        ctx.textAlign = 'right';
+        ctx.fillText(FILES.charAt(x), at.x + cell - pad, at.y + cell - pad);
+        ctx.textBaseline = 'top';
+        ctx.textAlign = 'left';
+      }
+    }
+  }
+}
+
+function drawHighlights(
+  ctx: CanvasRenderingContext2D,
+  layout: Layout,
+  theme: Theme,
+  squares: readonly Pos[],
+): void {
+  ctx.globalAlpha = HIGHLIGHT_ALPHA;
+  ctx.fillStyle = theme.brass;
+  for (const pos of squares) {
+    const at = layout.toScreen(pos);
+    ctx.fillRect(at.x, at.y, layout.cell, layout.cell);
+  }
+  ctx.globalAlpha = 1;
+}
+
+function screenAt(layout: Layout, x: number, y: number): { x: number; y: number } {
+  // Bilinear blend of square corners lets fractional positions animate smoothly.
+  const x0 = Math.floor(x);
+  const y0 = Math.floor(y);
+  const base = layout.toScreen({ x: x0, y: y0 });
+  const nx = layout.toScreen({ x: x0 + 1, y: y0 });
+  const ny = layout.toScreen({ x: x0, y: y0 + 1 });
+  const fx = x - x0;
+  const fy = y - y0;
+  return {
+    x: base.x + (nx.x - base.x) * fx + (ny.x - base.x) * fy,
+    y: base.y + (nx.y - base.y) * fx + (ny.y - base.y) * fy,
+  };
+}
+
+function drawPiece(
+  ctx: CanvasRenderingContext2D,
+  layout: Layout,
+  theme: Theme,
+  piece: DrawPiece,
+  showHp: boolean,
+): void {
+  const { cell } = layout;
+  const at = screenAt(layout, piece.x, piece.y);
+  const cx = at.x + cell / 2;
+
+  ctx.font = `${String(Math.round(cell * GLYPH_SIZE))}px ${theme.pieceFont}`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.lineJoin = 'round';
+  ctx.lineWidth = cell * OUTLINE_WIDTH;
+  ctx.shadowColor = SHADOW_COLOR;
+  ctx.shadowBlur = cell * SHADOW_BLUR;
+  ctx.shadowOffsetY = cell * SHADOW_OFFSET;
+  ctx.strokeStyle = piece.side === 0 ? theme.ebony : theme.ivory;
+  ctx.fillStyle = piece.side === 0 ? theme.ivory : theme.ebony;
+  const glyphY = at.y + cell * GLYPH_CENTER_Y;
+  ctx.strokeText(PIECE_GLYPH[piece.type], cx, glyphY);
+  ctx.shadowColor = 'transparent';
+  ctx.fillText(PIECE_GLYPH[piece.type], cx, glyphY);
+
+  ctx.font = `${String(Math.round(cell * STAR_SIZE))}px ${theme.pieceFont}`;
+  ctx.fillStyle = theme.brass;
+  ctx.fillText(STAR.repeat(piece.stars), cx, at.y + cell * STAR_Y);
+
+  if (showHp && piece.hp !== undefined && piece.maxHp !== undefined && piece.maxHp > 0) {
+    const ratio = Math.max(0, Math.min(1, piece.hp / piece.maxHp));
+    const barW = cell * HP_BAR_WIDTH;
+    const barH = Math.max(2, cell * HP_BAR_HEIGHT);
+    const barX = cx - barW / 2;
+    const barY = at.y + cell * HP_BAR_Y;
+    ctx.fillStyle = theme.wall;
+    ctx.fillRect(barX, barY, barW, barH);
+    ctx.fillStyle = ratio < LOW_HP ? theme.crimson : theme.heal;
+    ctx.fillRect(barX, barY, barW * ratio, barH);
+  }
+}
+
+/** Draw the whole battlefield. `timeMs` drives the portal pulse only. */
+export function drawScene(
+  ctx: CanvasRenderingContext2D,
+  layout: Layout,
+  theme: Theme,
+  scene: Scene,
+  timeMs: number,
+  reducedMotion: boolean,
+): void {
+  ctx.clearRect(0, 0, layout.width, layout.height);
+  drawSquares(ctx, layout, theme);
+  drawWall(ctx, layout, theme);
+  drawPortals(ctx, layout, theme, timeMs, reducedMotion);
+  drawNotation(ctx, layout, theme);
+  if (scene.highlights) drawHighlights(ctx, layout, theme, scene.highlights);
+  for (const piece of scene.pieces) {
+    drawPiece(ctx, layout, theme, piece, scene.showHp);
+  }
+}

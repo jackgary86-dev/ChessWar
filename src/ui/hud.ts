@@ -102,6 +102,7 @@ function benchRow(dock: DockView, actions: HudActions): HTMLElement {
     b.type = 'button';
     b.disabled = !dock.enabled;
     b.setAttribute('aria-label', slot.name);
+    b.dataset.slot = String(slot.index);
     if (slot.selected) b.classList.add('sel');
     if (slot.piece) {
       b.append(

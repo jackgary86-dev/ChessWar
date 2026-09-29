@@ -15,7 +15,7 @@ import {
   stepCombat,
 } from '@sim/game.ts';
 import type { GameMode, GameState } from '@sim/game.ts';
-import type { Side } from '@sim/types.ts';
+import type { PieceType, Side } from '@sim/types.ts';
 import {
   advancePlayback,
   createPlayback,
@@ -31,16 +31,18 @@ import { createFieldManual, createLogPanel } from '@ui/log.ts';
 import { battleLog, detectMerges, resultLogLine } from '@ui/log-model.ts';
 import { createOverlays } from '@ui/overlays.ts';
 import { overlayView, visiblePrepSides } from '@ui/overlays-model.ts';
+import { applyDrop, attachDrag } from '@ui/drag.ts';
 import { attachBoardInput, openSquares, tapBenchSlot, tapSquare } from '@ui/input.ts';
 import type { Selection, TapResult } from '@ui/input.ts';
+import type { Pos } from '@sim/board.ts';
+import { PIECES } from '@sim/data.ts';
 import { computeLayout, shouldStack } from '@ui/layout.ts';
 import type { Layout } from '@ui/layout.ts';
 import { drawScene, fitCanvas, prefersReducedMotion, readTheme } from '@ui/render.ts';
 import type { DrawPiece } from '@ui/render.ts';
 import '@ui/theme.css';
 
-// Drag-and-drop and the battle log arrive with later M3 tickets. This entry
-// point wires the HUD and overlays to a match (vs AI or hot-seat) so the round
+// This entry point wires the HUD and overlays to a match (vs AI or hot-seat) so the round
 // loop can be played: shop, place, Fight, watch the animation, read the result.
 const app = document.querySelector<HTMLDivElement>('#app');
 if (!app) {
@@ -83,6 +85,7 @@ let snapshot: UnitSnapshot[] = [];
 let animating: BattleState | null = null;
 let resultShownAtMs: number | null = null;
 let loggedLines = 0;
+let dropSquare: Pos | undefined;
 const logPanel = createLogPanel(infoRoot);
 createFieldManual(infoRoot);
 
@@ -257,6 +260,7 @@ function frame(nowMs: number): void {
       showHp: animating !== null,
       highlights: placing ? openSquares(game, acting(), selection) : [],
       ...(picked ? { selected: { x: picked.x, y: picked.y } } : {}),
+      ...(dropSquare ? { dropSquare } : {}),
     },
     nowMs,
     reducedMotion,
@@ -272,6 +276,47 @@ attachBoardInput(
     applyTap(tapSquare(game, acting(), selection, pos));
   },
 );
+
+function ownedPiece(id: number): { type: PieceType } | null | undefined {
+  const { holdings } = game.players[acting()];
+  return [...holdings.board, ...holdings.bench].find((p) => p?.id === id);
+}
+
+attachDrag({
+  canvas,
+  benchRoot: hudRoot,
+  getLayout: () => layout,
+  enabled: () => started && animating === null && game.phase === 'prep',
+  sourceAtSquare(pos) {
+    const piece = game.players[acting()].holdings.board.find((p) => p.x === pos.x && p.y === pos.y);
+    return piece ? { id: piece.id, from: 'board' } : null;
+  },
+  sourceAtBench(slot) {
+    const piece = game.players[acting()].holdings.bench[slot];
+    return piece ? { id: piece.id, from: 'bench' } : null;
+  },
+  ghostGlyph: (source) => {
+    const piece = ownedPiece(source.id);
+    return piece ? PIECES[piece.type].glyph : '';
+  },
+  onStart(source) {
+    selection = source;
+    say('');
+    refresh();
+  },
+  onHover(target) {
+    dropSquare = target?.kind === 'square' ? target.pos : undefined;
+  },
+  onDrop(source, target) {
+    dropSquare = undefined;
+    applyTap(applyDrop(game, acting(), source, target));
+  },
+  onCancel() {
+    dropSquare = undefined;
+    selection = null;
+    refresh();
+  },
+});
 
 window.addEventListener('resize', resize);
 resize();

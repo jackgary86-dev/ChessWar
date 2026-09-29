@@ -62,6 +62,24 @@ export default tseslint.config(
     },
   },
   {
+    // Every balance number lives in data.ts. Elsewhere in sim/, name your constants.
+    files: ['src/sim/**/*.ts'],
+    ignores: ['src/sim/data.ts'],
+    rules: {
+      '@typescript-eslint/no-magic-numbers': [
+        'error',
+        {
+          ignore: [-1, 0, 1, 2],
+          ignoreArrayIndexes: true,
+          ignoreEnums: true,
+          ignoreNumericLiteralTypes: true,
+          ignoreReadonlyClassProperties: true,
+          ignoreTypeIndexes: true,
+        },
+      ],
+    },
+  },
+  {
     files: ['src/ui/**/*.ts', 'src/main.ts'],
     languageOptions: {
       globals: { ...globals.browser },

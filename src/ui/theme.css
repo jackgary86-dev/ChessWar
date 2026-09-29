@@ -682,3 +682,32 @@ body {
     transform: none;
   }
 }
+
+/* Loading screen, shown until the art has been preloaded (or the wait times out). */
+.loading {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 8px;
+  background: var(--ground);
+  color: var(--muted);
+}
+
+.loading[hidden] {
+  display: none;
+}
+
+/* Icons from assets/icons, drawn in the text color. */
+.ico {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  margin-right: 6px;
+  vertical-align: -3px;
+  background: currentColor;
+  mask: var(--icon) center / contain no-repeat;
+  -webkit-mask: var(--icon) center / contain no-repeat;
+}

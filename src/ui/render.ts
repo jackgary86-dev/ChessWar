@@ -9,6 +9,7 @@
 import { BOARD } from '@sim/data.ts';
 import type { Pos } from '@sim/board.ts';
 import type { PieceType, Side, StarLevel } from '@sim/types.ts';
+import type { Effect } from './animation.ts';
 import type { Layout } from './layout.ts';
 
 export interface DrawPiece {
@@ -21,6 +22,10 @@ export interface DrawPiece {
   /** Current and maximum HP; the bar shows only when `showHp` is set. */
   readonly hp?: number;
   readonly maxHp?: number;
+  /** Height above its square in squares, for a knight's hop. */
+  readonly lift?: number;
+  /** Opacity 0-1 while fading out. */
+  readonly alpha?: number;
 }
 
 export interface Scene {
@@ -28,6 +33,8 @@ export interface Scene {
   readonly showHp: boolean;
   /** Squares to highlight, e.g. open squares while a bench piece is selected. */
   readonly highlights?: readonly Pos[];
+  /** Strike lines, floating numbers and death rings, drawn over the pieces. */
+  readonly effects?: readonly Effect[];
 }
 
 export interface Theme {
@@ -255,8 +262,10 @@ function drawPiece(
   showHp: boolean,
 ): void {
   const { cell } = layout;
-  const at = screenAt(layout, piece.x, piece.y);
+  const base = screenAt(layout, piece.x, piece.y);
+  const at = { x: base.x, y: base.y - cell * (piece.lift ?? 0) };
   const cx = at.x + cell / 2;
+  ctx.globalAlpha = piece.alpha ?? 1;
 
   ctx.font = `${String(Math.round(cell * GLYPH_SIZE))}px ${theme.pieceFont}`;
   ctx.textAlign = 'center';
@@ -288,6 +297,74 @@ function drawPiece(
     ctx.fillStyle = ratio < LOW_HP ? theme.crimson : theme.heal;
     ctx.fillRect(barX, barY, barW * ratio, barH);
   }
+  ctx.globalAlpha = 1;
+}
+
+const LINE_WIDTH = 0.09;
+const LINE_OUTLINE_EXTRA = 0.07;
+const FLOAT_RISE = 0.7;
+const FLOAT_SIZE = 0.34;
+const FLOAT_OUTLINE = 0.08;
+const RING_START = 0.25;
+const RING_GROWTH = 0.6;
+const RING_WIDTH = 0.06;
+
+function centerOf(layout: Layout, pos: Pos): { x: number; y: number } {
+  const at = screenAt(layout, pos.x, pos.y);
+  return { x: at.x + layout.cell / 2, y: at.y + layout.cell / 2 };
+}
+
+function toneColor(theme: Theme, tone: Side | 'heal'): string {
+  if (tone === 'heal') return theme.heal;
+  return tone === 0 ? theme.ivory : theme.ebony;
+}
+
+function drawEffects(
+  ctx: CanvasRenderingContext2D,
+  layout: Layout,
+  theme: Theme,
+  effects: readonly Effect[],
+): void {
+  const { cell } = layout;
+  ctx.lineCap = 'round';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  for (const effect of effects) {
+    const fade = 1 - effect.progress;
+    ctx.globalAlpha = fade;
+    if (effect.kind === 'line') {
+      const a = centerOf(layout, effect.from);
+      const b = centerOf(layout, effect.to);
+      ctx.beginPath();
+      ctx.moveTo(a.x, a.y);
+      ctx.lineTo(b.x, b.y);
+      // A contrasting under-stroke keeps an ebony line visible on dark squares.
+      ctx.strokeStyle = effect.tone === 1 ? theme.ivory : theme.ebony;
+      ctx.lineWidth = cell * (LINE_WIDTH + LINE_OUTLINE_EXTRA);
+      ctx.stroke();
+      ctx.strokeStyle = toneColor(theme, effect.tone);
+      ctx.lineWidth = cell * LINE_WIDTH;
+      ctx.stroke();
+    } else if (effect.kind === 'float') {
+      const c = centerOf(layout, effect.pos);
+      const y = c.y - cell * FLOAT_RISE * effect.progress;
+      ctx.font = `700 ${String(Math.round(cell * FLOAT_SIZE))}px ${theme.pieceFont}`;
+      ctx.lineJoin = 'round';
+      ctx.lineWidth = cell * FLOAT_OUTLINE;
+      ctx.strokeStyle = theme.wall;
+      ctx.strokeText(effect.text, c.x, y);
+      ctx.fillStyle = effect.tone === 'damage' ? theme.crimson : theme.heal;
+      ctx.fillText(effect.text, c.x, y);
+    } else {
+      const c = centerOf(layout, effect.pos);
+      ctx.beginPath();
+      ctx.arc(c.x, c.y, cell * (RING_START + RING_GROWTH * effect.progress), 0, TWO_PI);
+      ctx.strokeStyle = theme.crimson;
+      ctx.lineWidth = cell * RING_WIDTH;
+      ctx.stroke();
+    }
+  }
+  ctx.globalAlpha = 1;
 }
 
 /** Draw the whole battlefield. `timeMs` drives the portal pulse only. */
@@ -308,4 +385,5 @@ export function drawScene(
   for (const piece of scene.pieces) {
     drawPiece(ctx, layout, theme, piece, scene.showHp);
   }
+  if (scene.effects) drawEffects(ctx, layout, theme, scene.effects);
 }

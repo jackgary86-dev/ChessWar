@@ -24,8 +24,24 @@ export type Intent =
   | { readonly type: 'place'; readonly pieceId: number; readonly to: PlaceTarget }
   | { readonly type: 'ready' };
 
+/**
+ * `create` opens a room and returns its code; `join` takes a seat in an
+ * existing room; `rejoin` reclaims a seat with the token from `joined`.
+ * Before the match starts, `ready` is the lobby ready-up; once it has started
+ * it is the prep-phase intent.
+ */
 export type ClientMessage =
-  { readonly type: 'join'; readonly room: string; readonly name: string } | Intent;
+  | { readonly type: 'create'; readonly name: string }
+  | { readonly type: 'join'; readonly room: string; readonly name: string }
+  | { readonly type: 'rejoin'; readonly room: string; readonly token: string }
+  | Intent;
+
+/** One seat as shown in the lobby. */
+export interface LobbySeat {
+  readonly name: string;
+  readonly ready: boolean;
+  readonly connected: boolean;
+}
 
 export interface FightUnit {
   readonly id: number;
@@ -66,8 +82,23 @@ export interface SeatView {
 }
 
 export type ServerMessage =
-  | { readonly type: 'joined'; readonly room: string; readonly side: Side }
-  | { readonly type: 'waiting' }
+  | {
+      readonly type: 'joined';
+      readonly room: string;
+      readonly side: Side;
+      /** Secret for `rejoin`; keep it to resume this seat after a disconnect. */
+      readonly token: string;
+    }
+  | {
+      readonly type: 'lobby';
+      readonly room: string;
+      /** Seat 0 then seat 1; null while a seat is still empty. */
+      readonly seats: readonly [LobbySeat | null, LobbySeat | null];
+    }
+  /** The opponent dropped or came back. `forfeitMs` is the time left to return. */
+  | { readonly type: 'presence'; readonly connected: boolean; readonly forfeitMs: number | null }
+  /** The match ended early because a player did not return in time. */
+  | { readonly type: 'forfeit'; readonly winner: Side }
   | { readonly type: 'state'; readonly state: SeatView }
   | {
       readonly type: 'fight';
@@ -77,7 +108,6 @@ export type ServerMessage =
       readonly events: readonly BattleEvent[];
       readonly result: RoundResult;
     }
-  | { readonly type: 'opponent-left' }
   | { readonly type: 'error'; readonly error: ServerError };
 
 export type ServerError =
@@ -86,11 +116,14 @@ export type ServerError =
   | 'not-joined'
   | 'already-joined'
   | 'room-full'
+  | 'no-such-room'
+  | 'bad-token'
   | 'already-ready'
   | 'rejected';
 
 const MAX_NAME_LENGTH = 20;
 const MAX_ROOM_LENGTH = 32;
+const MAX_TOKEN_LENGTH = 128;
 const DEFAULT_NAME = 'Player';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -126,10 +159,17 @@ export function parseClientMessage(raw: string): ClientMessage | null {
   }
   if (!isRecord(data)) return null;
   switch (data.type) {
+    case 'create':
+      return { type: 'create', name: parseName(data.name) };
+    case 'rejoin':
+      if (typeof data.room !== 'string' || typeof data.token !== 'string') return null;
+      if (data.room === '' || data.room.length > MAX_ROOM_LENGTH) return null;
+      if (data.token === '' || data.token.length > MAX_TOKEN_LENGTH) return null;
+      return { type: 'rejoin', room: data.room.toUpperCase(), token: data.token };
     case 'join':
       if (typeof data.room !== 'string') return null;
       if (data.room === '' || data.room.length > MAX_ROOM_LENGTH) return null;
-      return { type: 'join', room: data.room, name: parseName(data.name) };
+      return { type: 'join', room: data.room.toUpperCase(), name: parseName(data.name) };
     case 'buy':
       return isInt(data.slot) ? { type: 'buy', slot: data.slot } : null;
     case 'sell':

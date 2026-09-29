@@ -47,3 +47,299 @@ body {
   font: inherit;
   cursor: pointer;
 }
+
+:root {
+  --panel-2: #27231b;
+  --brass-ink: #1a1408;
+  --t1: #9b968a;
+  --t2: #6fb56b;
+  --t3: #5c9ce0;
+  --t4: #e2aa3a;
+}
+
+.hud {
+  display: grid;
+  gap: 10px;
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 8px 16px 24px;
+}
+
+.scores {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 10px;
+  align-items: center;
+}
+
+.vs {
+  color: var(--muted);
+}
+
+.pcard {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px 12px;
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.pcard.active {
+  border-color: var(--brass);
+}
+
+.pcard .nm {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pcard .chip {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--muted);
+}
+
+.chip.s0 {
+  background: var(--ivory);
+}
+
+.chip.s1 {
+  background: var(--ebony);
+}
+
+.hpbar {
+  height: 8px;
+  background: var(--panel-2);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.hpbar i {
+  display: block;
+  height: 100%;
+  background: var(--heal);
+}
+
+.hpbar i.low {
+  background: var(--crimson);
+}
+
+.stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.stats b {
+  color: var(--ink);
+}
+
+.stats .gold b {
+  color: var(--brass);
+}
+
+.dock {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 12px;
+  display: grid;
+  gap: 12px;
+}
+
+.dock.off {
+  opacity: 0.55;
+}
+
+.dockhead {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.label {
+  font-size: 11.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.label b {
+  color: var(--ink);
+}
+
+.shop {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.card {
+  position: relative;
+  background: var(--panel-2);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-top: 4px solid var(--t1);
+  border-radius: 5px;
+  padding: 8px 6px 7px;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  min-width: 0;
+  font: inherit;
+  cursor: pointer;
+}
+
+.card:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.card.t1 {
+  border-top-color: var(--t1);
+}
+
+.card.t2 {
+  border-top-color: var(--t2);
+}
+
+.card.t3 {
+  border-top-color: var(--t3);
+}
+
+.card.t4 {
+  border-top-color: var(--t4);
+}
+
+.card .g {
+  font-family: var(--f-piece);
+  font-size: 36px;
+  line-height: 1.1;
+  color: var(--ivory);
+}
+
+.card .n {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.card .c {
+  font-size: 12px;
+  color: var(--brass);
+}
+
+.card .pips {
+  position: absolute;
+  top: 4px;
+  right: 5px;
+  display: flex;
+  gap: 2px;
+}
+
+.card .pips i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--brass);
+}
+
+.card.empty {
+  border-top-color: var(--line);
+  color: var(--muted);
+  font-size: 12px;
+  place-content: center;
+  min-height: 92px;
+}
+
+.bench {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.slot {
+  aspect-ratio: 1;
+  background: var(--panel-2);
+  color: var(--ivory);
+  border: 1px dashed var(--line);
+  border-radius: 5px;
+  font: inherit;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  padding: 0;
+}
+
+.slot.full {
+  border-style: solid;
+}
+
+.slot.sel {
+  border-color: var(--brass);
+  box-shadow: 0 0 0 2px var(--brass);
+}
+
+.slot .st {
+  color: var(--brass);
+  font-size: 10px;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.actions button {
+  background: var(--panel-2);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 8px 12px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.actions button.on {
+  border-color: var(--brass);
+}
+
+.actions button.primary {
+  background: var(--brass);
+  color: var(--brass-ink);
+  margin-left: auto;
+}
+
+.actions button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+@media (max-width: 620px) {
+  .scores {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .scores .vs {
+    display: none;
+  }
+}
+
+.slot .g {
+  font-family: var(--f-piece);
+  font-size: 26px;
+  line-height: 1;
+}
+
+.toast {
+  text-align: center;
+  color: var(--brass);
+  min-height: 1.4em;
+}

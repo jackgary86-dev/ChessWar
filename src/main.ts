@@ -326,6 +326,8 @@ function showTip(): void {
 function refresh(): void {
   hud.update(game, selection?.id ?? null);
   showTip();
+  // Speed, skip and sound controls belong to the fight; prep and the menus go without them.
+  speedBar.hidden = animating === null;
   overlays.show(
     onlineOverlay(online) ??
       overlayView(game, {

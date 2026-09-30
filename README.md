@@ -6,7 +6,7 @@ An auto-battler played with real chess pieces. Two players each own an 8×8 boar
 
 **The current build (TypeScript).** Run `npm ci` then `npm run dev` and open the address Vite prints. Choose a mode on the title screen: play against the AI, hot-seat (two people on one screen, with a privacy screen between turns), or online 1v1. A match in progress is saved in the browser and can be resumed. Sound has a mute toggle, and the battle log and field manual are in the game.
 
-**The prototype.** Open `prototype/chess-war.html` in a browser. It is a single file with no build step and is the reference for rules and feel. It carries a `Rules version` comment; bump it whenever a rule changes.
+**The prototype.** Open `prototype/chess-war.html` in a browser. It is a single file with no build step and is the reference for rules and feel. It carries a `Rules version` comment; bump it whenever a rule changes, and `tests/prototype-sync.test.ts` fails if its numbers drift from `src/sim/data.ts`.
 
 ## Playable demo
 

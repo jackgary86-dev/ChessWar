@@ -19,7 +19,8 @@
     "server": "tsx scripts/server.ts",
     "pieces": "tsx scripts/build-pieces.ts",
     "icons": "tsx scripts/build-icons.ts",
-    "fuzz": "tsx scripts/fuzz.ts"
+    "fuzz": "tsx scripts/fuzz.ts",
+    "perf": "tsx scripts/perf.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

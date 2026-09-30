@@ -1,0 +1,112 @@
+name: Preview
+
+# Deploys each pull request build to the staging box and comments the link.
+# Needs repository secrets (see docs/PREVIEW.md); without them the jobs are skipped.
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+
+concurrency:
+  group: preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  PREVIEW_HOST: ${{ secrets.PREVIEW_HOST }}
+  PREVIEW_USER: ${{ secrets.PREVIEW_USER }}
+  PREVIEW_ROOT: ${{ secrets.PREVIEW_ROOT }}
+  PREVIEW_BASE_URL: ${{ secrets.PREVIEW_BASE_URL }}
+
+jobs:
+  deploy:
+    name: Deploy preview
+    # Fork PRs get no secrets, so they never deploy.
+    if: >-
+      github.event.action != 'closed' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check preview secrets
+        id: configured
+        run: |
+          if [ -n "$PREVIEW_HOST" ] && [ -n "$PREVIEW_USER" ] && [ -n "$PREVIEW_ROOT" ] && [ -n "$PREVIEW_BASE_URL" ]; then
+            echo "yes=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Preview secrets are not set; skipping. See docs/PREVIEW.md."
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.configured.outputs.yes == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.configured.outputs.yes == 'true'
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci && npm run build
+        if: steps.configured.outputs.yes == 'true'
+
+      - name: Upload to staging
+        if: steps.configured.outputs.yes == 'true'
+        env:
+          SSH_KEY: ${{ secrets.PREVIEW_SSH_KEY }}
+        run: |
+          key="$RUNNER_TEMP/preview_key"
+          umask 077
+          printf '%s\n' "$SSH_KEY" > "$key"
+          PREVIEW_SSH_KEY_FILE="$key" scripts/preview-deploy.sh "${{ github.event.pull_request.number }}"
+
+      - name: Comment the preview link
+        if: steps.configured.outputs.yes == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const marker = '<!-- chess-war-preview -->';
+            const base = process.env.PREVIEW_BASE_URL.replace(/\/+$/, '');
+            const sha = context.payload.pull_request.head.sha.slice(0, 7);
+            const body = `${marker}\nPreview: ${base}/pr-${context.issue.number}/ (commit ${sha}). Removed when this PR closes.`;
+            const { data: comments } = await github.rest.issues.listComments({
+              ...context.repo, issue_number: context.issue.number, per_page: 100,
+            });
+            const mine = comments.find((c) => c.body.startsWith(marker));
+            if (mine) {
+              await github.rest.issues.updateComment({ ...context.repo, comment_id: mine.id, body });
+            } else {
+              await github.rest.issues.createComment({ ...context.repo, issue_number: context.issue.number, body });
+            }
+
+  remove:
+    name: Remove preview
+    if: >-
+      github.event.action == 'closed' &&
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check preview secrets
+        id: configured
+        run: |
+          if [ -n "$PREVIEW_HOST" ] && [ -n "$PREVIEW_USER" ] && [ -n "$PREVIEW_ROOT" ]; then
+            echo "yes=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "Preview secrets are not set; nothing to remove."
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.configured.outputs.yes == 'true'
+
+      - name: Delete from staging
+        if: steps.configured.outputs.yes == 'true'
+        env:
+          SSH_KEY: ${{ secrets.PREVIEW_SSH_KEY }}
+        run: |
+          key="$RUNNER_TEMP/preview_key"
+          umask 077
+          printf '%s\n' "$SSH_KEY" > "$key"
+          PREVIEW_SSH_KEY_FILE="$key" scripts/preview-remove.sh "${{ github.event.pull_request.number }}"

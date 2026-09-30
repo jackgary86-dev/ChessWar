@@ -1,0 +1,56 @@
+name: Release
+
+# Push a tag like v1.0.0 to build the game and attach chess-war-v1.0.0.zip to a GitHub Release.
+
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build and publish release
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Check the tag matches package.json
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          actual="$(node -p "require('./package.json').version")"
+          if [ "$version" != "$actual" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match package.json version $actual" >&2
+            exit 1
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+
+      - run: npm ci
+
+      - run: npm run lint
+
+      - run: npm test
+
+      - run: npm run build
+
+      - name: Package the static build
+        run: scripts/package-release.sh "$VERSION"
+
+      - name: Release notes from CHANGELOG.md
+        run: npx tsx scripts/release-notes.ts "$VERSION" > "$RUNNER_TEMP/notes.md"
+
+      - name: Create the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" "release/chess-war-v$VERSION.zip" \
+            --title "Chess War $GITHUB_REF_NAME" \
+            --notes-file "$RUNNER_TEMP/notes.md" \
+            --verify-tag

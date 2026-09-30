@@ -74,7 +74,7 @@ Serve the site over HTTP(S) from a folder or sub-path; asset links are relative.
 
 **Online server.** Online 1v1 needs the WebSocket server running: `npm run server` (port from the `PORT` env var, default 8787). The client connects to `ws://<page host>:8787`, or to whatever `?server=ws://host:port` says. Serve the game over `wss://` behind a proxy if the page is HTTPS.
 
-**Releases.** A release is a `dist/` build from a green main, zipped and named by version (for example `chess-war-v1.0.0.zip`), with the version in `package.json` and a matching `CHANGELOG.md` entry. Review this README at every release tag.
+**Releases.** Tag a green main `vX.Y.Z` (matching `package.json`, with a `[X.Y.Z]` section in `CHANGELOG.md`) and a workflow builds `dist/`, zips it as `chess-war-vX.Y.Z.zip` and attaches it to the GitHub Release; see [`docs/RELEASING.md`](docs/RELEASING.md). Review this README at every release tag.
 
 ## Reporting a bug
 

@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to Chess War. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/).
+All notable changes to Chess War. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/). Releases are tagged `vX.Y.Z`; see `docs/RELEASING.md`.
 
 ## [Unreleased]
 

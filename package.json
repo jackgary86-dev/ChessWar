@@ -20,7 +20,8 @@
     "pieces": "tsx scripts/build-pieces.ts",
     "icons": "tsx scripts/build-icons.ts",
     "fuzz": "tsx scripts/fuzz.ts",
-    "perf": "tsx scripts/perf.ts"
+    "perf": "tsx scripts/perf.ts",
+    "release-notes": "tsx scripts/release-notes.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

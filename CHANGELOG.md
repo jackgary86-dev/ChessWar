@@ -4,6 +4,8 @@ All notable changes to Chess War. The format follows [Keep a Changelog](https://
 
 ## [Unreleased]
 
+- Nothing yet beyond the 1.0.0 draft below; add entries here as work lands after tagging.
+
 ## [1.0.0]
 
 First public release. **Draft: the date and final wording are for the owner to confirm before tagging.**

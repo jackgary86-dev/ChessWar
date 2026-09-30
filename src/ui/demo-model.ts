@@ -6,6 +6,7 @@
  */
 import type { GameState } from '@sim/game.ts';
 import type { Holdings } from '@sim/shop.ts';
+import { boardCap } from '@sim/data.ts';
 
 /** The demo ends after this many rounds (or sooner if a commander falls). */
 export const DEMO_ROUNDS = 5;
@@ -30,7 +31,10 @@ export function demoFinished(game: GameState): boolean {
   return game.phase === 'over' || (game.phase === 'result' && game.round >= DEMO_ROUNDS);
 }
 
-export type TipStep = 'shop' | 'place' | 'portals';
+/** Rounds in which the board-cap hint may appear. */
+export const FIRST_MATCH_TIP_ROUNDS = 3;
+
+export type TipStep = 'shop' | 'place' | 'portals' | 'cap';
 
 export interface DemoTip {
   readonly step: TipStep;
@@ -54,12 +58,24 @@ function hasPairOfCopies(holdings: Readonly<Holdings>): boolean {
 }
 
 /**
- * The hint for the human's first prep phase, or null once the demo is past
- * round 1 (or a fight is on). Each step names the one thing to do next.
+ * The hint for the human's first prep phase, or null once past round 1 (or a
+ * fight is on). Each step names the one thing to do next. In rounds 2 and 3
+ * only the board-cap hint can appear, when the board is full and pieces wait
+ * on the bench.
  */
-export function demoTip(game: GameState): DemoTip | null {
-  if (game.round !== 1 || game.phase !== 'prep') return null;
-  const { holdings } = game.players[game.active];
+export function firstMatchTip(game: GameState): DemoTip | null {
+  if (game.phase !== 'prep' || game.round > FIRST_MATCH_TIP_ROUNDS) return null;
+  const player = game.players[game.active];
+  const { holdings } = player;
+  const cap = boardCap(player.econ.level);
+  const benched = holdings.bench.some((p) => p !== null);
+  if (holdings.board.length >= cap && benched) {
+    return {
+      step: 'cap',
+      text: `Your board holds ${String(cap)} piece${cap === 1 ? '' : 's'} at level ${String(player.econ.level)}. Buy XP to level up and field more, or swap a piece from the bench.`,
+    };
+  }
+  if (game.round !== 1) return null;
   if (holdings.board.length > 0) {
     return {
       step: 'portals',
@@ -77,6 +93,9 @@ export function demoTip(game: GameState): DemoTip | null {
     text: `Shop: tap a card to buy a piece with your gold. Buy ${String(MERGE_COPIES)} copies of one piece to merge them into a stronger ★★.`,
   };
 }
+
+/** The demo shows the same guidance as the first match of the full game. */
+export const demoTip = firstMatchTip;
 
 /** Merge hint shown beside the main tip once two copies of a piece are held. */
 export function mergeNudge(game: GameState): string | null {

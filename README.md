@@ -2,13 +2,15 @@
 
 An auto-battler played with real chess pieces. Two players each own an 8×8 board. The boards sit side by side, split by a wall and linked by portal squares. Buy pieces from a shop, combine three copies into a stronger star level, place up to 8 pieces on your board, then watch both armies fight it out automatically.
 
-## Play the prototype
+## Play
 
-Open `prototype/chess-war.html` in a browser. It is a single file with no build step. You can play against the AI, or with two people taking turns on the same screen.
+**The current build (TypeScript).** Run `npm ci` then `npm run dev` and open the address Vite prints. Choose a mode on the title screen: play against the AI, hot-seat (two people on one screen, with a privacy screen between turns), or online 1v1. A match in progress is saved in the browser and can be resumed. Sound has a mute toggle, and the battle log and field manual are in the game.
+
+**The prototype.** Open `prototype/chess-war.html` in a browser. It is a single file with no build step and is the reference for rules and feel. It carries a `Rules version` comment; bump it whenever a rule changes, and `tests/prototype-sync.test.ts` fails if its numbers drift from `src/sim/data.ts`.
 
 ## Playable demo
 
-Add `?demo` to the page address (for example `http://localhost:5173/?demo`) for a short showcase: vs AI only, 5 rounds, hints through the first round (shop, placement, portals, merging), and an end screen that links to the full game. Demo matches are not saved.
+Add `?demo` to the page address (for example `http://localhost:5173/?demo`) for a short showcase: vs AI only, 5 rounds, hints through the first round (shop, placement, portals, merging), and an end screen that links to the full game. Demo matches are not saved. The script for presenting it is in [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md).
 
 ## How a round works
 
@@ -33,6 +35,12 @@ Add `?demo` to the page address (for example `http://localhost:5173/?demo`) for 
 
 The full rules, including numbers, economy and AI behavior, are in [`docs/CODER_PROMPT.md`](docs/CODER_PROMPT.md).
 
+## Tuning balance
+
+Every balance number lives in `src/sim/data.ts`: piece cost, tier, HP, attack and speed (`PIECES`), star multipliers (`STAR_HP_MULT`, `STAR_ATK_MULT`), ability values (`ABILITY`), the board and battle timing (`BOARD`, `BATTLE`), economy and XP (`ECONOMY`, `XP_TO_NEXT_LEVEL`), pool sizes and shop odds (`POOL_SIZE`, `TIER_ODDS`), fight damage (`FIGHT_DAMAGE`) and AI behaviour (`AI`, `AI_DIFFICULTY`). Nothing else in `src/` may hard-code a balance value; ESLint's `no-magic-numbers` rule on `src/sim` enforces that.
+
+To tune: edit `data.ts`, then check the effect with `npm run sim -- --games 500` (AI vs AI, reports win rates and match length) and run `npm test`, since tests pin some of these values. If a change alters a rule or number the prototype also states, update `prototype/chess-war.html` to match.
+
 ## Development
 
 Requires Node 24 (see `.nvmrc`).
@@ -46,9 +54,31 @@ npm run build     type-check and build static files into dist/
 npm run pieces    regenerate the piece sprites in assets/pieces/ from scripts/build-pieces.ts
 npm run server    online 1v1 WebSocket server (PORT env var, default 8787): create a room, share the 4-letter code, both ready up. In the browser choose Play online; the client connects to `ws://<page host>:8787`, or to `?server=ws://host:port`
 npm run sim       headless AI-vs-AI balance runner, e.g. npm run sim -- --games 500
+npm run fuzz      battle simulation fuzz test over many seeds
+npm run icons     regenerate app icons and favicon from the logo mark
+npm run preview   serve the built dist/ locally
 ```
 
+`src/sim` must stay pure and deterministic: no DOM, timers, `Math.random` or `Date.now`. ESLint enforces it.
+
 CI runs lint, test, build and a 1-game sim on every push and pull request, and uploads `dist/` as a build artifact named `chess-war-dist-<commit sha>` (kept 14 days). Find it on the run page under Actions.
+
+## Deploying
+
+The build is static files. `npm run build` type-checks and writes everything to `dist/`; there is no server-side code for single-player.
+
+1. **Staging.** Copy the contents of `dist/` into the web root of the staging server (NixonExpress) and play a full match there, including save and resume.
+2. **Live Game Portal.** Once staging looks right, copy the same `dist/` into the live Game Portal web root. Keep the previous release's files (or zip) so you can put them back if something is wrong.
+
+Serve the site over HTTP(S) from a folder or sub-path; asset links are relative. Opening `dist/index.html` from disk will not work in most browsers.
+
+**Online server.** Online 1v1 needs the WebSocket server running: `npm run server` (port from the `PORT` env var, default 8787). The client connects to `ws://<page host>:8787`, or to whatever `?server=ws://host:port` says. Serve the game over `wss://` behind a proxy if the page is HTTPS.
+
+**Releases.** Tag a green main `vX.Y.Z` (matching `package.json`, with a `[X.Y.Z]` section in `CHANGELOG.md`) and a workflow builds `dist/`, zips it as `chess-war-vX.Y.Z.zip` and attaches it to the GitHub Release; see [`docs/RELEASING.md`](docs/RELEASING.md). Review this README at every release tag.
+
+## Reporting a bug
+
+Open a new issue and choose the **Bug report** template (`.github/ISSUE_TEMPLATE/bug_report.yml`). Include the browser and device, what you did, what you expected, and the seed or round if you have it. Severity labels and how bugs are triaged are in [`docs/TRIAGE.md`](docs/TRIAGE.md).
 
 ## Repository layout
 
@@ -56,10 +86,18 @@ CI runs lint, test, build and a 1-game sim on every push and pull request, and u
 src/sim/                   Pure, deterministic game logic (no DOM, timers or Math.random)
 src/ui/                    Canvas renderer, input and DOM HUD
 src/main.ts                Browser entry point
+src/server/                Online 1v1 WebSocket server (rooms, protocol)
 tests/                     Vitest unit tests
 scripts/sim.ts             Headless balance runner behind npm run sim
+scripts/fuzz.ts            Battle fuzz runner behind npm run fuzz
+scripts/server.ts          Entry point for npm run server
+assets/, public/           Piece sprites, brand art, app icons and favicon
 prototype/chess-war.html   Playable single-file prototype (reference for rules and feel)
 docs/CODER_PROMPT.md       Spec and build brief for the full TypeScript project
+docs/art/                  Art direction, style guide and UI kit
+docs/DEMO_SCRIPT.md        Script for presenting the demo
+docs/TRIAGE.md             Bug severity and triage process
+.github/                   CI workflow, issue templates, labels, PR template
 docs/tickets.json          Development tickets (one GitHub issue each)
 tickets/                   The same tickets as one Markdown file each
 scripts/upload-tickets.ps1 Creates labels, milestones and issues on GitHub, one issue every 10 s
@@ -80,6 +118,8 @@ Running alongside those:
 - **Art**: style guide first, then pieces, boards, portals, VFX and UI
 - **QA and bug checks**: checklists for the sim, economy, UI, saves, performance, accessibility and online play
 - **Demo and artifacts**: CI builds, preview deploys, release zips, a demo build and demo media
+
+Milestones are on the Milestones page on GitHub. **Current stage: pre-Alpha** (M1 to M5, art, QA checks and the demo are merged; the gate checkers have not closed yet). Update this line when each gate checker closes.
 
 Release stages, each closed by a gate checker issue:
 

@@ -39,6 +39,11 @@ body {
   padding: 8px;
 }
 
+/* Only shown while a fight plays; display: flex would otherwise beat the hidden attribute. */
+.controls[hidden] {
+  display: none;
+}
+
 .controls button {
   background: var(--panel);
   color: var(--ink);
@@ -397,6 +402,16 @@ body {
   .scores .vs {
     display: none;
   }
+
+  /* Narrow cards: reserve a footer strip so the cost badge and pips sit below the name
+     instead of on top of it. */
+  .card {
+    padding-bottom: 30px;
+  }
+
+  .card .n {
+    font-size: 12px;
+  }
 }
 
 .slot .g {
@@ -712,7 +727,6 @@ body {
   -webkit-mask: var(--icon) center / contain no-repeat;
 }
 
-<<<<<<< HEAD
 /* Every control shows where keyboard focus is; the cards add their own inset ring above. */
 button:focus-visible,
 input:focus-visible,
@@ -720,7 +734,8 @@ select:focus-visible,
 canvas.battlefield:focus-visible {
   outline: 2px solid var(--brass);
   outline-offset: 2px;
-=======
+}
+
 .demo-tip {
   max-width: 640px;
   margin: 0 auto;
@@ -733,5 +748,4 @@ canvas.battlefield:focus-visible {
 
 .demo-tip[hidden] {
   display: none;
->>>>>>> e2f4ccad1c9f6a82945d98dba8fbe38d0b7d7cb7
 }

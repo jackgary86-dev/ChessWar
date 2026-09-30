@@ -40,10 +40,19 @@ import {
   browserStorage,
   clearSave,
   loadGame,
+  markTipsDone,
   readSave,
   saveGame,
+  tipsDone,
 } from '@ui/storage.ts';
-import { demoFinished, demoTip, fullGameHref, isDemo, mergeNudge } from '@ui/demo-model.ts';
+import {
+  FIRST_MATCH_TIP_ROUNDS,
+  demoFinished,
+  firstMatchTip,
+  fullGameHref,
+  isDemo,
+  mergeNudge,
+} from '@ui/demo-model.ts';
 import { overlayView, visiblePrepSides } from '@ui/overlays-model.ts';
 import { applyDrop, attachDrag } from '@ui/drag.ts';
 import type { DropTarget } from '@ui/drag.ts';
@@ -304,8 +313,11 @@ function moveTo(source: Selection | null, target: DropTarget): void {
   applyTap(result);
 }
 
+/** Hints show in the demo, and in the first vs-AI match of the full game. */
 function showTip(): void {
-  const tip = demo && started && animating === null ? demoTip(game) : null;
+  if (!demo && game.round > FIRST_MATCH_TIP_ROUNDS) markTipsDone(storage);
+  const wanted = demo || (!online && game.mode === 'ai' && !tipsDone(storage));
+  const tip = wanted && started && animating === null ? firstMatchTip(game) : null;
   const nudge = tip ? mergeNudge(game) : null;
   tipBox.hidden = tip === null;
   tipBox.textContent = tip ? (nudge ? `${tip.text} ${nudge}` : tip.text) : '';
